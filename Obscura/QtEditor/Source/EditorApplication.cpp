@@ -320,20 +320,21 @@ namespace ObscuraEditor
         return list;
     }
 
-    QVariantMap EditorApplication::getEntity(const QString &uuidHex)
+    QVariant EditorApplication::getEntity(const QString &uuidHex)
     {
-        QVariantMap map;
         if (!m_Engine)
         {
-            return map;
+            return QVariant();
         }
 
         std::uint64_t uuid = parseUUID(uuidHex);
         Obscura::EntityDesc desc{};
         if (!m_Engine->GetEntityDescByUUID(uuid, &desc))
         {
-            return map;
+            return QVariant();
         }
+
+        QVariantMap map;
 
         map["uuid"]        = formatUUID(desc.uuid);
         map["name"]        = QString::fromUtf8(desc.name);

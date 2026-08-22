@@ -45,7 +45,7 @@ namespace ObscuraEditor
 
         // Entity ECS manipulation
         Q_INVOKABLE QVariantList getEntityList();
-        Q_INVOKABLE QVariantMap  getEntity(const QString &uuidHex);
+        Q_INVOKABLE QVariant     getEntity(const QString &uuidHex);
         Q_INVOKABLE QString      createEntity(const QString &name = "Entity", const QString &parentUuidHex = QString());
         Q_INVOKABLE bool         destroyEntity(const QString &uuidHex);
         Q_INVOKABLE bool         setEntityName(const QString &uuidHex, const QString &name);

@@ -245,8 +245,10 @@ ComponentBase {
                     height: parent.height - 12
                     fillMode: Image.PreserveAspectFit
                     source: (root.textureSlot >= 0 && root.textureSlot < root.availableTextures.length) ? root.availableTextures[root.textureSlot] : ""
+                    asynchronous: true
+                    sourceSize: Qt.size(256, 256)
                     smooth: true
-                    mipmap: true
+                    mipmap: false
                 }
 
                 // Empty / Loading state placeholder
@@ -254,8 +256,17 @@ ComponentBase {
                     anchors.centerIn: parent
                     visible: texturePreviewImage.status !== Image.Ready
                     spacing: 4
+
+                    BusyIndicator {
+                        running: texturePreviewImage.status === Image.Loading
+                        visible: running
+                        Layout.alignment: Qt.AlignHCenter
+                        implicitWidth: 20
+                        implicitHeight: 20
+                    }
+
                     Label {
-                        text: "No Texture Loaded"
+                        text: texturePreviewImage.status === Image.Loading ? "Loading Preview..." : "No Texture Loaded"
                         font.pixelSize: 10
                         color: "#718096"
                         Layout.alignment: Qt.AlignHCenter
@@ -314,9 +325,9 @@ ComponentBase {
     // Interactive RGBA Color Sliders Popup
     Popup {
         id: colorPickerPopup
-        width: 240
-        height: 200
-        modal: true
+        width: 300
+        height: 300
+        modal: false
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         x: (parent.width - width) / 2
@@ -332,7 +343,7 @@ ComponentBase {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 10
-            spacing: 6
+            spacing: 0
 
             Label {
                 text: "Edit RGBA Tint"

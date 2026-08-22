@@ -49,7 +49,8 @@ Rectangle {
 
     function selectEntity(uuid) {
         root.selectedEntityUuid = uuid;
-        root.selectedEntity = EditorApp.getEntity(uuid);
+        var ent = uuid ? EditorApp.getEntity(uuid) : null;
+        root.selectedEntity = (ent && ent.uuid) ? ent : null;
         root.entitySelected(uuid, root.selectedEntity);
     }
 
@@ -69,7 +70,8 @@ Rectangle {
         }
         function onEntityUpdated(uuid) {
             if (uuid === root.selectedEntityUuid) {
-                root.selectedEntity = EditorApp.getEntity(uuid);
+                var ent = EditorApp.getEntity(uuid);
+                root.selectedEntity = (ent && ent.uuid) ? ent : null;
             }
         }
     }
