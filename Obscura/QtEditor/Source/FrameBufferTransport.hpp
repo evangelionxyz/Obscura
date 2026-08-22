@@ -3,15 +3,27 @@
 #include <Obscura/IRHI.hpp>
 
 #include <QtGui/QImage>
-#include <mutex>
+#include <array>
+#include <atomic>
 #include <cstdint>
 
 namespace ObscuraEditor
 {
+    struct FrameBufferPayload
+    {
+        Obscura::GPUTextureHandle gpuHandle{};
+        QImage                    image;
+        bool                      isGPUInterop = false;
+        bool                      isValid      = false;
+    };
+
     class FrameBufferTransport
     {
     public:
-        FrameBufferTransport() = default;
+        FrameBufferTransport()
+            : m_WriteIndex(0), m_ReadIndex(1), m_LatestIndex(2), m_HasNewFrame(false)
+        {
+        }
         ~FrameBufferTransport() = default;
 
         bool UpdateFromRHI(Obscura::IRHI* rhi)
@@ -21,13 +33,16 @@ namespace ObscuraEditor
                 return false;
             }
 
+            FrameBufferPayload& payload = m_Buffers[m_WriteIndex];
+
             // Check if RHI provides direct GPU Texture Interop
             Obscura::GPUTextureHandle gpuHandle = rhi->GetGPUTextureHandle();
             if (gpuHandle.isGPUInterop && gpuHandle.nativeHandle != nullptr)
             {
-                std::lock_guard<std::mutex> lock(m_Mutex);
-                m_GpuHandle = gpuHandle;
-                m_HasNewFrame = true;
+                payload.gpuHandle = gpuHandle;
+                payload.isGPUInterop = true;
+                payload.isValid = true;
+                PublishWriteBuffer();
                 return true;
             }
 
@@ -48,43 +63,59 @@ namespace ObscuraEditor
                          static_cast<qsizetype>(stride),
                          QImage::Format_RGBA8888);
 
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            m_CurrentImage = frame.copy();
-            m_GpuHandle.isGPUInterop = false;
-            m_HasNewFrame = true;
+            payload.image = frame.copy();
+            payload.gpuHandle = Obscura::GPUTextureHandle{};
+            payload.isGPUInterop = false;
+            payload.isValid = true;
+            PublishWriteBuffer();
             return true;
         }
 
         [[nodiscard]] Obscura::GPUTextureHandle AcquireGpuHandle()
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            m_HasNewFrame = false;
-            return m_GpuHandle;
+            AcquireLatestReadBuffer();
+            return m_Buffers[m_ReadIndex].gpuHandle;
         }
 
         [[nodiscard]] QImage AcquireFrame()
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            m_HasNewFrame = false;
-            return m_CurrentImage;
+            AcquireLatestReadBuffer();
+            return m_Buffers[m_ReadIndex].image;
         }
 
-        [[nodiscard]] bool HasNewFrame() const
+        [[nodiscard]] bool HasNewFrame() const noexcept
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            return m_HasNewFrame;
+            return m_HasNewFrame.load(std::memory_order_acquire);
         }
 
-        [[nodiscard]] bool IsGPUInterop() const
+        [[nodiscard]] bool IsGPUInterop() const noexcept
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            return m_GpuHandle.isGPUInterop;
+            return m_Buffers[m_ReadIndex].isGPUInterop;
         }
 
     private:
-        mutable std::mutex       m_Mutex;
-        Obscura::GPUTextureHandle m_GpuHandle{};
-        QImage                   m_CurrentImage;
-        bool                     m_HasNewFrame = false;
+        void PublishWriteBuffer() noexcept
+        {
+            std::uint32_t prevLatest = m_LatestIndex.exchange(m_WriteIndex, std::memory_order_release);
+            m_WriteIndex = prevLatest;
+            m_HasNewFrame.store(true, std::memory_order_release);
+        }
+
+        void AcquireLatestReadBuffer() noexcept
+        {
+            if (m_HasNewFrame.load(std::memory_order_acquire))
+            {
+                std::uint32_t newest = m_LatestIndex.exchange(m_ReadIndex, std::memory_order_acq_rel);
+                m_ReadIndex = newest;
+                m_HasNewFrame.store(false, std::memory_order_release);
+            }
+        }
+
+    private:
+        std::array<FrameBufferPayload, 3> m_Buffers{};
+        std::uint32_t                     m_WriteIndex{0};
+        std::uint32_t                     m_ReadIndex{1};
+        std::atomic<std::uint32_t>        m_LatestIndex{2};
+        std::atomic<bool>                 m_HasNewFrame{false};
     };
 }

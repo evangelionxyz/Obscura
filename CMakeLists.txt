@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(MSVC)
+    add_compile_options(/FS)
+endif()
+
 # Qt Project Setup
 # Enable Qt automoc, autouic, autorcc
 set(CMAKE_AUTOMOC ON)
@@ -49,6 +53,7 @@ add_subdirectory(Thirdparty/spdlog)
 add_subdirectory(Thirdparty/ShaderCompiler)
 add_subdirectory(Thirdparty/glm)
 add_subdirectory(Thirdparty/entt)
+add_subdirectory(Thirdparty/cppcoro)
 
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/stb")

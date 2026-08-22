@@ -28,13 +28,18 @@ using namespace ObscuraEditor;
 int main(int argc, char *argv[])
 {
 #if defined(_WIN32)
-    if (AttachConsole(ATTACH_PARENT_PROCESS))
+    if (!AttachConsole(ATTACH_PARENT_PROCESS))
     {
-        FILE* fpOut = nullptr;
-        FILE* fpErr = nullptr;
-        freopen_s(&fpOut, "CONOUT$", "w", stdout);
-        freopen_s(&fpErr, "CONOUT$", "w", stderr);
+        AllocConsole();
     }
+    FILE* fpOut = nullptr;
+    FILE* fpErr = nullptr;
+    FILE* fpIn  = nullptr;
+    freopen_s(&fpOut, "CONOUT$", "w", stdout);
+    freopen_s(&fpErr, "CONOUT$", "w", stderr);
+    freopen_s(&fpIn,  "CONIN$",  "r", stdin);
+    std::ios::sync_with_stdio(true);
+    SetConsoleTitleW(L"Obscura Editor Console");
 #endif
 
     Obscura::Logger::Init();
@@ -123,8 +128,6 @@ int main(int argc, char *argv[])
         exitCode = app.exec();
     }
 
-    // Now all Qt Quick windows, SceneGraphs, textures, buffers, and command buffers
-    // are safely destroyed before we shut down the engine and destroy VkDevice!
     editorApp.shutdown();
 
     Obscura::Logger::Shutdown();

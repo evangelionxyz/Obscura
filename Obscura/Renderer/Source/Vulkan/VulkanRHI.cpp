@@ -1,4 +1,6 @@
 #include "VulkanRHI.hpp"
+#include "VulkanBindlessSystem.hpp"
+#include "VulkanBindingSetManager.hpp"
 
 #include <Obscura/API.hpp>
 #include <Obscura/IRHI.hpp>
@@ -482,6 +484,9 @@ namespace Obscura
         {
             vkDeviceWaitIdle(m_Device);
         }
+
+        VulkanBindlessSystem::Shutdown();
+        VulkanBindingSetManager::Shutdown();
 
         DestroyOffscreenTarget();
 

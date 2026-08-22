@@ -338,6 +338,7 @@ namespace Obscura
         m_Pipeline.Destroy();
         m_VertShader.Destroy();
         m_FragShader.Destroy();
+        VulkanBindlessSystem::Shutdown();
 
         m_Initialized = false;
         LOG_INFO("[SceneRenderer] SceneRenderer shutdown complete.");

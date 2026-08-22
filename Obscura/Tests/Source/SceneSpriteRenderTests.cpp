@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include <Scene.hpp>
-#include <SceneRenderer.hpp>
+#include <Scene/Scene.hpp>
+#include <Scene/SceneRenderer.hpp>
 #include <Vulkan/VulkanBindlessSystem.hpp>
 #include <Vulkan/VulkanRHI.hpp>
 #include <Vulkan/VulkanTexture.hpp>

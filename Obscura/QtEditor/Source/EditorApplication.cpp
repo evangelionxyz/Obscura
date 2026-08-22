@@ -194,8 +194,7 @@ namespace ObscuraEditor
             {
                 if (rhi->ResizeOffscreenTarget(width, height))
                 {
-                    m_Transport.UpdateFromRHI(rhi);
-                    emit frameRendered();
+                    onTick();
                 }
             }
         }

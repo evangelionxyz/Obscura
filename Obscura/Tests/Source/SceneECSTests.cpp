@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <Scene.hpp>
+#include <Scene/Scene.hpp>
 #include <unordered_set>
 #include <cstdint>
 

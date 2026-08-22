@@ -4,6 +4,7 @@
     {
       "hidden": false,
       "name": "Qt-Debug",
+      "displayName": "Qt Debug (Ninja)",
       "inherits": "Qt-Default",
       "binaryDir": "${sourceDir}/out/build/debug",
       "cacheVariables": {
@@ -17,9 +18,40 @@
     {
       "hidden": false,
       "name": "Qt-Release",
+      "displayName": "Qt Release (Ninja)",
       "inherits": "Qt-Default",
       "binaryDir": "${sourceDir}/out/build/release",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "hidden": false,
+      "name": "VS2026-Debug",
+      "displayName": "Visual Studio 2026 Debug",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/Build",
+      "environment": {
+        "QTDIR": "C:/Qt/6.11.1/msvc2022_64"
+      },
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "hidden": false,
+      "name": "VS2026-Release",
+      "displayName": "Visual Studio 2026 Release",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/Build",
+      "environment": {
+        "QTDIR": "C:/Qt/6.11.1/msvc2022_64"
+      },
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },

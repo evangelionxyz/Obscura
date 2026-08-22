@@ -15,6 +15,7 @@ target_link_libraries(Obscura.Engine PRIVATE
     Obscura.Core
     Obscura.Renderer
     EnTT::EnTT
+    stb
 )
 
 target_compile_definitions(Obscura.Engine PRIVATE OBSCURA_ENGINE_EXPORTS)

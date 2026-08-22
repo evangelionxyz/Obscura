@@ -5,8 +5,10 @@
 #include <Obscura/Module.hpp>
 #include <Obscura/Types.hpp>
 
-#include "Scene.hpp"
-#include "SceneRenderer.hpp"
+#include <Obscura/WorkerManager.hpp>
+#include "Assets/AssetManager.hpp"
+#include "Scene/Scene.hpp"
+#include "Scene/SceneRenderer.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -24,6 +26,10 @@ public:
     {
         m_Params = params;
         LOG_INFO("[Engine.dll] Initializing '{}' ({}x{})...", m_Params.AppTitle, m_Params.WindowWidth, m_Params.WindowHeight);
+
+        // Initialize core concurrency and asset subsystem
+        Obscura::WorkerManager::Get().Initialize();
+        Obscura::AssetManager::Get().Initialize();
 
         // Dynamically load Renderer RHI module (loose runtime coupling, preventing circular dependencies)
         const std::filesystem::path rhiPath = "Obscura.Renderer.dll";
@@ -113,6 +119,9 @@ public:
             m_RhiModule.Unload();
             LOG_INFO("[Engine.dll] Engine shutdown complete.");
         }
+
+        Obscura::AssetManager::Get().Shutdown();
+        Obscura::WorkerManager::Get().Shutdown();
     }
 
     void Tick(float deltaTime) override

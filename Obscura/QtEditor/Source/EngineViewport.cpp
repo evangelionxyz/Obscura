@@ -44,7 +44,9 @@ namespace ObscuraEditor
     {
         if (change == ItemSceneChange && value.window)
         {
-            connect(value.window, &QQuickWindow::sceneGraphInvalidated, this, &EngineViewport::ClearTextureCache, Qt::DirectConnection);
+            connect(value.window, &QQuickWindow::sceneGraphInvalidated, this, [this]() {
+                ClearTextureCache();
+            }, Qt::DirectConnection);
         }
         QQuickItem::itemChange(change, value);
     }
@@ -82,6 +84,11 @@ namespace ObscuraEditor
         {
             m_PendingResize = false;
             ClearTextureCache();
+
+            // Safely recreate node so oldNode doesn't retain deleted texture pointers
+            delete node;
+            node = new QSGSimpleTextureNode();
+            node->setOwnsTexture(false);
 
             if (s_Application)
             {
@@ -122,7 +129,9 @@ namespace ObscuraEditor
                  m_TextureCache.front().height != m_LatestGpuHandle.height))
             {
                 ClearTextureCache();
-                node->setTexture(nullptr);
+                delete node;
+                node = new QSGSimpleTextureNode();
+                node->setOwnsTexture(false);
             }
 
             QSGTexture* targetSgTexture = nullptr;
@@ -162,8 +171,18 @@ namespace ObscuraEditor
 
             if (targetSgTexture)
             {
-                node->setTexture(targetSgTexture);
+                if (node->ownsTexture())
+                {
+                    delete node->texture();
+                    node->setOwnsTexture(false);
+                }
+
+                if (node->texture() != targetSgTexture)
+                {
+                    node->setTexture(targetSgTexture);
+                }
                 node->setRect(boundingRect());
+                node->setFiltering(QSGTexture::Linear);
                 node->markDirty(QSGNode::DirtyMaterial | QSGNode::DirtyGeometry);
                 return node;
             }
@@ -175,10 +194,17 @@ namespace ObscuraEditor
         {
             ClearTextureCache();
 
-            node->setOwnsTexture(true);
+            if (node->ownsTexture())
+            {
+                delete node->texture();
+                node->setOwnsTexture(false);
+            }
+
             QSGTexture *texture = window()->createTextureFromImage(m_LatestImage, QQuickWindow::TextureIsOpaque);
+            node->setOwnsTexture(true);
             node->setTexture(texture);
             node->setRect(boundingRect());
+            node->setFiltering(QSGTexture::Linear);
             node->markDirty(QSGNode::DirtyMaterial | QSGNode::DirtyGeometry);
             return node;
         }
@@ -186,10 +212,10 @@ namespace ObscuraEditor
         // Placeholder dark frame
         if (!node->texture())
         {
-            node->setOwnsTexture(true);
             QImage placeholder(64, 64, QImage::Format_RGBA8888);
             placeholder.fill(QColor(18, 20, 24));
             QSGTexture *texture = window()->createTextureFromImage(placeholder);
+            node->setOwnsTexture(true);
             node->setTexture(texture);
         }
 
