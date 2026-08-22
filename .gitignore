@@ -1,0 +1,13 @@
+.vs
+.agent
+.agents
+.github/agents
+.github/prompts
+.github/skills
+Build
+openspec
+
+*.slnx
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user

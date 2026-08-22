@@ -1,0 +1,87 @@
+root = true
+
+# -----------------------------------------------------------------------------
+# Global defaults
+# -----------------------------------------------------------------------------
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# -----------------------------------------------------------------------------
+# C and C++ source/header/module files
+# -----------------------------------------------------------------------------
+[*.{c,cc,cpp,cxx,h,hh,hpp,hxx,ipp,inl,tpp,ixx,cppm,mxx}]
+indent_style = space
+indent_size = 4
+tab_width = 4
+max_line_length = 120
+
+# Keep spacing and braces consistent across editors.
+# These are standard EditorConfig keys supported by many tools.
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# -----------------------------------------------------------------------------
+# Visual Studio C++ formatting hints (optional; ignored if unsupported)
+# Uncomment and tune these if you use Visual Studio's C++ formatter.
+# -----------------------------------------------------------------------------
+# [*.{cc,cpp,cxx,h,hh,hpp,hxx,ixx,cppm}]
+# cpp_indent_case_contents = true
+# cpp_indent_case_labels = true
+# cpp_indent_braces = false
+# cpp_indent_preserve_within_parentheses = false
+# cpp_space_after_cast_close_parenthesis = true
+# cpp_space_after_keywords_in_control_flow_statements = true
+# cpp_space_before_function_open_parenthesis = false
+# cpp_space_between_empty_braces = false
+# cpp_space_within_parentheses = false
+# cpp_wrap_preserve_blocks = true
+
+# -----------------------------------------------------------------------------
+# Preprocessor-heavy files can be easier to read with tabs.
+# Keep disabled unless you prefer this style.
+# -----------------------------------------------------------------------------
+# [*.{h,hpp,hxx}]
+# indent_style = tab
+# tab_width = 4
+# indent_size = 4
+
+# -----------------------------------------------------------------------------
+# CMake files (if added later)
+# -----------------------------------------------------------------------------
+[CMakeLists.txt]
+indent_style = space
+indent_size = 4
+
+[*.cmake]
+indent_style = space
+indent_size = 4
+
+# -----------------------------------------------------------------------------
+# Premake / Lua scripts in this repository
+# -----------------------------------------------------------------------------
+[*.lua]
+indent_style = space
+indent_size = 4
+tab_width = 4
+max_line_length = 120
+
+# -----------------------------------------------------------------------------
+# JSON project files
+# -----------------------------------------------------------------------------
+[*.json]
+indent_style = space
+indent_size = 2
+
+# -----------------------------------------------------------------------------
+# Markdown docs
+# Keep trailing whitespace for line breaks in markdown when needed.
+# -----------------------------------------------------------------------------
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
