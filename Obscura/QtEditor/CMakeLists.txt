@@ -13,12 +13,15 @@ qt_add_qml_module(ObscuraQtEditor
     QML_FILES
         QML/Main.qml
         QML/EditorMenuBar.qml
+        QML/SceneOutliner.qml
         QML/ViewportPanel.qml
         QML/ViewportToolbar.qml
         QML/Float3.qml
         QML/ContextualInspector.qml
         QML/Components/ComponentBase.qml
+        QML/Components/IDComponent.qml
         QML/Components/TransformComponent.qml
+        QML/Components/Sprite2DComponent.qml
 )
 
 target_include_directories(ObscuraQtEditor PRIVATE

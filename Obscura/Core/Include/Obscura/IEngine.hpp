@@ -17,6 +17,16 @@ namespace Obscura
         virtual const char* GetVersion() const = 0;
         virtual IRHI*       GetRHI() const = 0;
         virtual void        Destroy()    = 0;
+
+        // Scene / Entity inspection & manipulation
+        virtual std::uint32_t GetEntityCount() const = 0;
+        virtual bool          GetEntityDescByIndex(std::uint32_t index, EntityDesc* outDesc) const = 0;
+        virtual bool          GetEntityDescByUUID(std::uint64_t uuid, EntityDesc* outDesc) const = 0;
+        virtual std::uint64_t CreateEntity(const char* name = "Entity", std::uint64_t parentUuid = 0) = 0;
+        virtual bool          DestroyEntity(std::uint64_t uuid) = 0;
+        virtual bool          SetEntityName(std::uint64_t uuid, const char* name) = 0;
+        virtual bool          SetEntityTransform(std::uint64_t uuid, const float position[3], const float rotation[3], const float scale[3]) = 0;
+        virtual bool          SetEntitySprite2D(std::uint64_t uuid, const float color[4], std::uint32_t textureSlot, bool useTexture, const float uvOffset[2], const float uvScale[2], bool visible) = 0;
     };
 
     // Function pointer typedefs for dynamic loading

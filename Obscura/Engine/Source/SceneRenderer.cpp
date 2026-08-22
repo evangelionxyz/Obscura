@@ -157,6 +157,81 @@ namespace Obscura
             return false;
         }
 
+        // 6. Pre-load available textures into Vulkan Bindless System
+        m_LoadedTextures.clear();
+
+        std::vector<std::filesystem::path> textureFiles;
+        std::filesystem::path texFileProbe = VFS::ResolvePath("Resources/Textures/img_1.jpg");
+        std::filesystem::path texDir;
+        if (!texFileProbe.empty())
+        {
+            texDir = texFileProbe.parent_path();
+        }
+        else
+        {
+            texFileProbe = VFS::ResolvePath("Textures/img_1.jpg");
+            if (!texFileProbe.empty())
+            {
+                texDir = texFileProbe.parent_path();
+            }
+        }
+
+        if (!texDir.empty() && std::filesystem::exists(texDir) && std::filesystem::is_directory(texDir))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(texDir))
+            {
+                if (entry.is_regular_file())
+                {
+                    auto ext = entry.path().extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".tga" || ext == ".bmp")
+                    {
+                        textureFiles.push_back(entry.path());
+                    }
+                }
+            }
+            std::sort(textureFiles.begin(), textureFiles.end());
+        }
+
+        if (textureFiles.empty())
+        {
+            for (const auto& relPath : { "Resources/Textures/img_1.jpg", "Resources/Textures/img_2.jpg", "Resources/Textures/img_3.jpg" })
+            {
+                auto p = VFS::ResolvePath(relPath);
+                if (!p.empty() && std::filesystem::exists(p))
+                {
+                    textureFiles.push_back(p);
+                }
+            }
+        }
+
+        for (const auto& filePath : textureFiles)
+        {
+            auto tex = std::make_unique<VulkanTexture>();
+            if (tex->LoadFromFile(device, physDevice, commandPool, queue, filePath))
+            {
+                uint32_t slot = VulkanBindlessSystem::RegisterTexture(*tex);
+                LOG_INFO("[SceneRenderer] Loaded texture '{}' -> Bindless Slot {}", filePath.filename().string(), slot);
+                m_LoadedTextures.push_back(std::move(tex));
+            }
+            else
+            {
+                LOG_WARN("[SceneRenderer] Failed to load texture '{}'", filePath.string());
+            }
+        }
+
+        if (m_LoadedTextures.empty())
+        {
+            uint32_t whitePixel = 0xFFFFFFFF;
+            auto whiteTex = std::make_unique<VulkanTexture>();
+            if (whiteTex->Create(device, physDevice, commandPool, queue, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, &whitePixel))
+            {
+                uint32_t slot = VulkanBindlessSystem::RegisterTexture(*whiteTex);
+                LOG_INFO("[SceneRenderer] Created fallback 1x1 white texture -> Bindless Slot {}", slot);
+                m_LoadedTextures.push_back(std::move(whiteTex));
+            }
+        }
+
         vkDestroyCommandPool(device, commandPool, nullptr);
 
         m_Initialized = true;
@@ -257,6 +332,7 @@ namespace Obscura
             return;
         }
 
+        m_LoadedTextures.clear();
         m_DefaultQuadVB.Destroy();
         m_DefaultQuadIB.Destroy();
         m_Pipeline.Destroy();

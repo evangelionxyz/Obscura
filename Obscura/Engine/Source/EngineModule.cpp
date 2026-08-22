@@ -146,6 +146,148 @@ public:
         delete this;
     }
 
+    std::uint32_t GetEntityCount() const override
+    {
+        return static_cast<std::uint32_t>(m_Scene.GetRegistry().view<Obscura::IDComponent>().size());
+    }
+
+    bool GetEntityDescByIndex(std::uint32_t index, Obscura::EntityDesc* outDesc) const override
+    {
+        if (!outDesc) return false;
+        auto view = m_Scene.GetRegistry().view<Obscura::IDComponent>();
+        std::uint32_t currentIndex = 0;
+        for (auto entity : view)
+        {
+            if (currentIndex == index)
+            {
+                PopulateEntityDesc(entity, outDesc);
+                return true;
+            }
+            currentIndex++;
+        }
+        return false;
+    }
+
+    bool GetEntityDescByUUID(std::uint64_t uuid, Obscura::EntityDesc* outDesc) const override
+    {
+        if (!outDesc) return false;
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+        PopulateEntityDesc(entity, outDesc);
+        return true;
+    }
+
+    std::uint64_t CreateEntity(const char* name, std::uint64_t parentUuid) override
+    {
+        std::string entityName = (name && name[0] != '\0') ? name : "Entity";
+        auto entity = m_Scene.CreateEntityWithUUID(0, entityName, parentUuid);
+        auto& sprite = m_Scene.AddComponent<Obscura::Sprite2D>(entity);
+        sprite.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        sprite.useTexture = false;
+
+        return m_Scene.GetComponent<Obscura::IDComponent>(entity).uuid;
+    }
+
+    bool DestroyEntity(std::uint64_t uuid) override
+    {
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+        m_Scene.DestroyEntity(entity);
+        return true;
+    }
+
+    bool SetEntityName(std::uint64_t uuid, const char* name) override
+    {
+        if (!name) return false;
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+        if (m_Scene.HasComponent<Obscura::IDComponent>(entity))
+        {
+            m_Scene.GetComponent<Obscura::IDComponent>(entity).name = name;
+        }
+        if (m_Scene.HasComponent<Obscura::TagComponent>(entity))
+        {
+            m_Scene.GetComponent<Obscura::TagComponent>(entity).tag = name;
+        }
+        return true;
+    }
+
+    bool SetEntityTransform(std::uint64_t uuid, const float position[3], const float rotation[3], const float scale[3]) override
+    {
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+        if (!m_Scene.HasComponent<Obscura::Transform>(entity))
+        {
+            m_Scene.AddComponent<Obscura::Transform>(entity);
+        }
+        auto& transform = m_Scene.GetComponent<Obscura::Transform>(entity);
+        if (position) transform.position = { position[0], position[1], position[2] };
+        if (rotation) transform.rotation = { rotation[0], rotation[1], rotation[2] };
+        if (scale)    transform.scale    = { scale[0], scale[1], scale[2] };
+        return true;
+    }
+
+    bool SetEntitySprite2D(std::uint64_t uuid, const float color[4], std::uint32_t textureSlot, bool useTexture, const float uvOffset[2], const float uvScale[2], bool visible) override
+    {
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+        if (!m_Scene.HasComponent<Obscura::Sprite2D>(entity))
+        {
+            m_Scene.AddComponent<Obscura::Sprite2D>(entity);
+        }
+        auto& sprite = m_Scene.GetComponent<Obscura::Sprite2D>(entity);
+        if (color) sprite.color = { color[0], color[1], color[2], color[3] };
+        sprite.textureSlot = textureSlot;
+        sprite.useTexture  = useTexture;
+        if (uvOffset) sprite.uvOffset = { uvOffset[0], uvOffset[1] };
+        if (uvScale)  sprite.uvScale  = { uvScale[0], uvScale[1] };
+        sprite.visible     = visible;
+        return true;
+    }
+
+private:
+    void PopulateEntityDesc(entt::entity entity, Obscura::EntityDesc* outDesc) const
+    {
+        *outDesc = Obscura::EntityDesc{};
+        if (m_Scene.HasComponent<Obscura::IDComponent>(entity))
+        {
+            const auto& idComp = m_Scene.GetComponent<Obscura::IDComponent>(entity);
+            outDesc->uuid = idComp.uuid;
+            outDesc->parentUuid = idComp.parentUuid;
+            strncpy_s(outDesc->name, sizeof(outDesc->name), idComp.name.c_str(), _TRUNCATE);
+        }
+        if (m_Scene.HasComponent<Obscura::Transform>(entity))
+        {
+            const auto& t = m_Scene.GetComponent<Obscura::Transform>(entity);
+            outDesc->hasTransform = true;
+            outDesc->position[0] = t.position.x;
+            outDesc->position[1] = t.position.y;
+            outDesc->position[2] = t.position.z;
+            outDesc->rotation[0] = t.rotation.x;
+            outDesc->rotation[1] = t.rotation.y;
+            outDesc->rotation[2] = t.rotation.z;
+            outDesc->scale[0]    = t.scale.x;
+            outDesc->scale[1]    = t.scale.y;
+            outDesc->scale[2]    = t.scale.z;
+        }
+        if (m_Scene.HasComponent<Obscura::Sprite2D>(entity))
+        {
+            const auto& s = m_Scene.GetComponent<Obscura::Sprite2D>(entity);
+            outDesc->hasSprite2D = true;
+            outDesc->spriteColor[0] = s.color.r;
+            outDesc->spriteColor[1] = s.color.g;
+            outDesc->spriteColor[2] = s.color.b;
+            outDesc->spriteColor[3] = s.color.a;
+            outDesc->textureSlot = s.textureSlot;
+            outDesc->useTexture  = s.useTexture;
+            outDesc->uvOffset[0] = s.uvOffset.x;
+            outDesc->uvOffset[1] = s.uvOffset.y;
+            outDesc->uvScale[0]  = s.uvScale.x;
+            outDesc->uvScale[1]  = s.uvScale.y;
+            outDesc->spriteVisible = s.visible;
+        }
+    }
+
 private:
     Obscura::EngineInitParams                  m_Params{};
     Obscura::Module                            m_RhiModule;

@@ -7,6 +7,10 @@
 #include "Vulkan/VulkanBuffers.hpp"
 #include "Vulkan/VulkanGraphicsPipeline.hpp"
 #include "Vulkan/VulkanShader.hpp"
+#include "Vulkan/VulkanTexture.hpp"
+
+#include <memory>
+#include <vector>
 
 namespace Obscura
 {
@@ -40,6 +44,7 @@ namespace Obscura
         VulkanIndexBuffer      m_DefaultQuadIB;
         SceneGraph             m_SceneGraph;
 
+        std::vector<std::unique_ptr<VulkanTexture>> m_LoadedTextures;
         bool                   m_Initialized = false;
     };
 }

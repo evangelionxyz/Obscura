@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <Scene.hpp>
+#include <unordered_set>
+#include <cstdint>
 
 TEST(SceneECSTest, EntityLifecycleAndComponents)
 {
@@ -10,9 +12,13 @@ TEST(SceneECSTest, EntityLifecycleAndComponents)
     auto e2 = scene.CreateEntity("Enemy");
 
     EXPECT_FALSE(scene.IsEmpty());
+    EXPECT_TRUE(scene.HasComponent<Obscura::IDComponent>(e1));
     EXPECT_TRUE(scene.HasComponent<Obscura::TagComponent>(e1));
     EXPECT_TRUE(scene.HasComponent<Obscura::Transform>(e1));
     EXPECT_EQ(scene.GetComponent<Obscura::TagComponent>(e1).tag, "Player");
+    EXPECT_EQ(scene.GetComponent<Obscura::IDComponent>(e1).name, "Player");
+    EXPECT_NE(scene.GetComponent<Obscura::IDComponent>(e1).uuid, 0u);
+    EXPECT_NE(scene.GetComponent<Obscura::IDComponent>(e1).uuid, scene.GetComponent<Obscura::IDComponent>(e2).uuid);
 
     // Add Sprite2D
     auto& sprite = scene.AddComponent<Obscura::Sprite2D>(e1);
@@ -34,6 +40,36 @@ TEST(SceneECSTest, EntityLifecycleAndComponents)
 
     scene.Clear();
     EXPECT_TRUE(scene.IsEmpty());
+}
+
+TEST(SceneECSTest, IDComponentAndUUIDUniqueness)
+{
+    Obscura::Scene scene;
+    std::unordered_set<uint64_t> uuids;
+
+    for (int i = 0; i < 100; ++i)
+    {
+        auto entity = scene.CreateEntity("Node_" + std::to_string(i));
+        ASSERT_TRUE(scene.HasComponent<Obscura::IDComponent>(entity));
+        const auto& idComp = scene.GetComponent<Obscura::IDComponent>(entity);
+        EXPECT_NE(idComp.uuid, 0u);
+        EXPECT_EQ(idComp.parentUuid, 0u);
+        EXPECT_EQ(idComp.name, "Node_" + std::to_string(i));
+        EXPECT_TRUE(uuids.insert(idComp.uuid).second); // Must be uniquely inserted
+    }
+
+    // Test Parent UUID relationship
+    auto parent = scene.CreateEntity("ParentNode");
+    uint64_t parentUuid = scene.GetComponent<Obscura::IDComponent>(parent).uuid;
+
+    auto child = scene.CreateEntityWithUUID(0, "ChildNode", parentUuid);
+    const auto& childId = scene.GetComponent<Obscura::IDComponent>(child);
+    EXPECT_EQ(childId.parentUuid, parentUuid);
+
+    // Test FindEntityByUUID
+    EXPECT_EQ(scene.FindEntityByUUID(parentUuid), parent);
+    EXPECT_EQ(scene.FindEntityByUUID(childId.uuid), child);
+    EXPECT_EQ(scene.FindEntityByUUID(0xDEADBEEF), entt::null);
 }
 
 TEST(SceneECSTest, TransformMatrixComputation)

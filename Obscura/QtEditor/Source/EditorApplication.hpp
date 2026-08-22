@@ -11,6 +11,10 @@
 #include <QtCore/QTimer>
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QString>
+#include <QtCore/QStringList>
+#include <QtCore/QVariant>
+#include <QtCore/QList>
+#include <QtCore/QMap>
 #include <QtQml/qqmlregistration.h>
 
 #include <filesystem>
@@ -39,6 +43,17 @@ namespace ObscuraEditor
         Q_INVOKABLE void shutdown();
         Q_INVOKABLE void requestExit();
 
+        // Entity ECS manipulation
+        Q_INVOKABLE QVariantList getEntityList();
+        Q_INVOKABLE QVariantMap  getEntity(const QString &uuidHex);
+        Q_INVOKABLE QString      createEntity(const QString &name = "Entity", const QString &parentUuidHex = QString());
+        Q_INVOKABLE bool         destroyEntity(const QString &uuidHex);
+        Q_INVOKABLE bool         setEntityName(const QString &uuidHex, const QString &name);
+        Q_INVOKABLE bool         setEntityTransform(const QString &uuidHex, double px, double py, double pz, double rx, double ry, double rz, double sx, double sy, double sz);
+        Q_INVOKABLE bool         setEntitySprite2D(const QString &uuidHex, double cr, double cg, double cb, double ca, int textureSlot, bool useTexture, double uvOx, double uvOy, double uvSx, double uvSy, bool visible);
+        Q_INVOKABLE QStringList  getAvailableTextures();
+        Q_INVOKABLE QString      getTexturePathForSlot(int slot);
+
         void onViewportResized(std::uint32_t width, std::uint32_t height);
         void handleMouseMove(float x, float y);
         void handleMouseButton(int button, bool pressed, float x, float y);
@@ -61,6 +76,8 @@ namespace ObscuraEditor
         void statsUpdated();
         void vsyncChanged();
         void logMessage(const QString &message);
+        void sceneEntitiesChanged();
+        void entityUpdated(const QString &uuidHex);
 
     private slots:
         void onTick();

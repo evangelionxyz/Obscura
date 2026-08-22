@@ -9,12 +9,34 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
+#include <chrono>
 #include <cstdint>
+#include <limits>
+#include <random>
 #include <string>
 #include <utility>
 
 namespace Obscura
 {
+    // Generates a random 64-bit uint64_t UUID hash (non-zero)
+    inline uint64_t GenerateUUID64()
+    {
+        static thread_local std::mt19937_64 generator(
+            static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count())
+            ^ std::random_device{}()
+        );
+        static thread_local std::uniform_int_distribution<uint64_t> distribution(1, std::numeric_limits<uint64_t>::max());
+        return distribution(generator);
+    }
+
+    // Component: ID (64-bit uint64_t UUID hash, name, parent UUID)
+    struct IDComponent
+    {
+        uint64_t    uuid       = 0;
+        std::string name       = "Entity";
+        uint64_t    parentUuid = 0; // 0 = root / no parent
+    };
+
     // Push constant block for 2D Sprite rendering: exactly 128 bytes.
     struct SpritePushConstants
     {
@@ -82,8 +104,22 @@ namespace Obscura
 
         // Entity lifecycle
         entt::entity CreateEntity(const std::string& name = "Entity");
+        entt::entity CreateEntityWithUUID(uint64_t uuid, const std::string& name = "Entity", uint64_t parentUuid = 0);
         void         DestroyEntity(entt::entity entity);
         void         Clear();
+
+        [[nodiscard]] entt::entity FindEntityByUUID(uint64_t uuid) const
+        {
+            auto view = m_Registry.view<IDComponent>();
+            for (auto entity : view)
+            {
+                if (view.get<IDComponent>(entity).uuid == uuid)
+                {
+                    return entity;
+                }
+            }
+            return entt::null;
+        }
 
         template <typename Component, typename... Args>
         Component& AddComponent(entt::entity entity, Args&&... args)

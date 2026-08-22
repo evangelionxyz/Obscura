@@ -276,4 +276,225 @@ namespace ObscuraEditor
             emit statsUpdated();
         }
     }
+
+    static QString formatUUID(std::uint64_t uuid)
+    {
+        return QString("0x%1").arg(uuid, 16, 16, QLatin1Char('0')).toUpper();
+    }
+
+    static std::uint64_t parseUUID(const QString &uuidStr)
+    {
+        QString clean = uuidStr.trimmed();
+        if (clean.startsWith("0x", Qt::CaseInsensitive))
+        {
+            clean = clean.mid(2);
+        }
+        bool ok = false;
+        std::uint64_t val = clean.toULongLong(&ok, 16);
+        return ok ? val : 0;
+    }
+
+    QVariantList EditorApplication::getEntityList()
+    {
+        QVariantList list;
+        if (!m_Engine)
+        {
+            return list;
+        }
+
+        std::uint32_t count = m_Engine->GetEntityCount();
+        for (std::uint32_t i = 0; i < count; ++i)
+        {
+            Obscura::EntityDesc desc{};
+            if (m_Engine->GetEntityDescByIndex(i, &desc))
+            {
+                QVariantMap item;
+                item["uuid"]        = formatUUID(desc.uuid);
+                item["name"]        = QString::fromUtf8(desc.name);
+                item["parentUuid"]  = formatUUID(desc.parentUuid);
+                item["type"]        = desc.hasSprite2D ? "Sprite2D" : "Entity";
+                item["hasTransform"] = desc.hasTransform;
+                item["hasSprite2D"]  = desc.hasSprite2D;
+                list.append(item);
+            }
+        }
+        return list;
+    }
+
+    QVariantMap EditorApplication::getEntity(const QString &uuidHex)
+    {
+        QVariantMap map;
+        if (!m_Engine)
+        {
+            return map;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        Obscura::EntityDesc desc{};
+        if (!m_Engine->GetEntityDescByUUID(uuid, &desc))
+        {
+            return map;
+        }
+
+        map["uuid"]        = formatUUID(desc.uuid);
+        map["name"]        = QString::fromUtf8(desc.name);
+        map["parentUuid"]  = formatUUID(desc.parentUuid);
+        map["hasTransform"] = desc.hasTransform;
+        map["posX"]        = desc.position[0];
+        map["posY"]        = desc.position[1];
+        map["posZ"]        = desc.position[2];
+        map["rotX"]        = desc.rotation[0];
+        map["rotY"]        = desc.rotation[1];
+        map["rotZ"]        = desc.rotation[2];
+        map["scaleX"]      = desc.scale[0];
+        map["scaleY"]      = desc.scale[1];
+        map["scaleZ"]      = desc.scale[2];
+
+        map["hasSprite2D"]   = desc.hasSprite2D;
+        map["colorR"]        = desc.spriteColor[0];
+        map["colorG"]        = desc.spriteColor[1];
+        map["colorB"]        = desc.spriteColor[2];
+        map["colorA"]        = desc.spriteColor[3];
+        map["textureSlot"]   = static_cast<int>(desc.textureSlot);
+        map["useTexture"]    = desc.useTexture;
+        map["uvOffsetX"]     = desc.uvOffset[0];
+        map["uvOffsetY"]     = desc.uvOffset[1];
+        map["uvScaleX"]      = desc.uvScale[0];
+        map["uvScaleY"]      = desc.uvScale[1];
+        map["spriteVisible"] = desc.spriteVisible;
+
+        return map;
+    }
+
+    QString EditorApplication::createEntity(const QString &name, const QString &parentUuidHex)
+    {
+        if (!m_Engine)
+        {
+            return QString();
+        }
+
+        std::uint64_t parentUuid = parseUUID(parentUuidHex);
+        std::uint64_t newUuid = m_Engine->CreateEntity(name.toUtf8().constData(), parentUuid);
+        QString uuidStr = formatUUID(newUuid);
+        emit sceneEntitiesChanged();
+        return uuidStr;
+    }
+
+    bool EditorApplication::destroyEntity(const QString &uuidHex)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        bool success = m_Engine->DestroyEntity(uuid);
+        if (success)
+        {
+            emit sceneEntitiesChanged();
+        }
+        return success;
+    }
+
+    bool EditorApplication::setEntityName(const QString &uuidHex, const QString &name)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        bool success = m_Engine->SetEntityName(uuid, name.toUtf8().constData());
+        if (success)
+        {
+            emit sceneEntitiesChanged();
+            emit entityUpdated(uuidHex);
+        }
+        return success;
+    }
+
+    bool EditorApplication::setEntityTransform(const QString &uuidHex, double px, double py, double pz, double rx, double ry, double rz, double sx, double sy, double sz)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        float pos[3]   = { static_cast<float>(px), static_cast<float>(py), static_cast<float>(pz) };
+        float rot[3]   = { static_cast<float>(rx), static_cast<float>(ry), static_cast<float>(rz) };
+        float scale[3] = { static_cast<float>(sx), static_cast<float>(sy), static_cast<float>(sz) };
+
+        bool success = m_Engine->SetEntityTransform(uuid, pos, rot, scale);
+        if (success)
+        {
+            emit entityUpdated(uuidHex);
+        }
+        return success;
+    }
+
+    bool EditorApplication::setEntitySprite2D(const QString &uuidHex, double cr, double cg, double cb, double ca, int textureSlot, bool useTexture, double uvOx, double uvOy, double uvSx, double uvSy, bool visible)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        float color[4]    = { static_cast<float>(cr), static_cast<float>(cg), static_cast<float>(cb), static_cast<float>(ca) };
+        float uvOffset[2] = { static_cast<float>(uvOx), static_cast<float>(uvOy) };
+        float uvScale[2]  = { static_cast<float>(uvSx), static_cast<float>(uvSy) };
+
+        bool success = m_Engine->SetEntitySprite2D(uuid, color, static_cast<std::uint32_t>(textureSlot), useTexture, uvOffset, uvScale, visible);
+        if (success)
+        {
+            emit entityUpdated(uuidHex);
+        }
+        return success;
+    }
+
+    QStringList EditorApplication::getAvailableTextures()
+    {
+        QStringList textures;
+
+        const QStringList candidateDirs = {
+            QCoreApplication::applicationDirPath() + "/Resources/Textures",
+            QCoreApplication::applicationDirPath() + "/../Resources/Textures",
+            "D:/Dev/TestDLL/Obscura/Resources/Textures"
+        };
+
+        for (const auto &dirPath : candidateDirs)
+        {
+            QDir dir(dirPath);
+            if (dir.exists())
+            {
+                QStringList filters;
+                filters << "*.jpg" << "*.jpeg" << "*.png" << "*.tga" << "*.bmp";
+                QFileInfoList fileList = dir.entryInfoList(filters, QDir::Files | QDir::Readable, QDir::Name);
+                for (const auto &fileInfo : fileList)
+                {
+                    QString fileUrl = QUrl::fromLocalFile(fileInfo.absoluteFilePath()).toString();
+                    if (!textures.contains(fileUrl))
+                    {
+                        textures.append(fileUrl);
+                    }
+                }
+                if (!textures.isEmpty())
+                {
+                    break;
+                }
+            }
+        }
+        return textures;
+    }
+
+    QString EditorApplication::getTexturePathForSlot(int slot)
+    {
+        QStringList list = getAvailableTextures();
+        if (slot >= 0 && slot < list.size())
+        {
+            return list.at(slot);
+        }
+        return QString();
+    }
 }

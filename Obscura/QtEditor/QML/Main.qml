@@ -44,85 +44,13 @@ ApplicationWindow {
                 }
 
                 // Left Panel: Scene Outliner / Hierarchy
-                Rectangle {
+                SceneOutliner {
+                    id: sceneOutliner
                     SplitView.preferredWidth: 260
                     SplitView.minimumWidth: 180
-                    color: "#1a1d24"
-                    border.color: "#282c37"
-                    border.width: 1
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        spacing: 0
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 28
-                            color: "#20242e"
-                            border.color: "#2d3340"
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                spacing: 4
-                                Label {
-                                    text: "Outliner"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#a0aec0"
-                                }
-                                Item { Layout.fillWidth: true }
-                                ToolButton {
-                                    text: "+ Add"
-                                    implicitHeight: 18
-                                    font.pixelSize: 12
-                                    leftPadding: 6
-                                    rightPadding: 6
-                                    topPadding: 0
-                                    bottomPadding: 0
-                                }
-                            }
-                        }
-
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            model: ListModel {
-                                ListElement { name: "Main Camera"; type: "Camera" }
-                                ListElement { name: "Directional Light"; type: "Light" }
-                                ListElement { name: "Sky Atmosphere"; type: "Atmosphere" }
-                                ListElement { name: "Environment Mesh"; type: "StaticMesh" }
-                                ListElement { name: "Post Process Volume"; type: "PostProcess" }
-                            }
-                            delegate: ItemDelegate {
-                                width: parent.width
-                                height: 22
-                                leftPadding: 8
-                                rightPadding: 8
-                                topPadding: 0
-                                bottomPadding: 0
-                                contentItem: RowLayout {
-                                    spacing: 6
-                                    Label {
-                                        text: "◆"
-                                        font.pixelSize: 12
-                                        color: "#6c8dfa"
-                                    }
-                                    Label {
-                                        text: name
-                                        font.pixelSize: 12
-                                        color: "#e2e8f0"
-                                        Layout.fillWidth: true
-                                    }
-                                    Label {
-                                        text: type
-                                        font.pixelSize: 12
-                                        color: "#718096"
-                                    }
-                                }
-                            }
-                        }
+                    onEntitySelected: (uuid, entityData) => {
+                        contextualInspector.updateFromEntity(uuid);
                     }
                 }
 
@@ -133,74 +61,13 @@ ApplicationWindow {
                     SplitView.fillHeight: true
                 }
 
-                // Right Panel: Inspector / Properties
-                Rectangle {
+                // Right Panel: Contextual Inspector / Properties
+                ContextualInspector {
+                    id: contextualInspector
                     SplitView.preferredWidth: 300
                     SplitView.minimumWidth: 220
-                    color: "#1a1d24"
-                    border.color: "#282c37"
-                    border.width: 1
-
-                    ColumnLayout {
-                        anchors.fill: parent
-                        spacing: 0
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 28
-                            color: "#20242e"
-                            border.color: "#2d3340"
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                Label {
-                                    text: "Inspector"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#a0aec0"
-                                }
-                            }
-                        }
-
-                        ScrollView {
-                            id: inspectorScroll
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-
-                            ColumnLayout {
-                                width: inspectorScroll.availableWidth
-                                x: 0
-                                spacing: 8
-
-                                TransformComponent {}
-
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    height: 1
-                                    color: "#2d3340"
-                                }
-                                Label {
-                                    text: "Engine Subsystems"
-                                    font.bold: true
-                                    font.pixelSize: 12
-                                    color: "#cbd5e0"
-                                }
-                                Label {
-                                    text: `RHI Backend: ${EditorApp.rhiName}`
-                                    font.pixelSize: 12
-                                    color: "#a0aec0"
-                                }
-                                Label {
-                                    text: `Engine ABI: v${EditorApp.engineVersion}`
-                                    font.pixelSize: 12
-                                    color: "#a0aec0"
-                                }
-                            }
-                        }
-                    }
+                    selectedEntityUuid: sceneOutliner.selectedEntityUuid
+                    selectedEntity: sceneOutliner.selectedEntity
                 }
             }
 

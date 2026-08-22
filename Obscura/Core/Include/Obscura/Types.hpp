@@ -33,6 +33,25 @@ namespace Obscura
         std::uint32_t ABIVersion = PLUGIN_ABI_VERSION;
     };
 
+    // Description struct for serializing entity ECS data across module boundaries
+    struct EntityDesc
+    {
+        std::uint64_t uuid         = 0;
+        char          name[128]    = { 0 };
+        std::uint64_t parentUuid   = 0;
+        bool          hasTransform = false;
+        float         position[3]  = { 0.0f, 0.0f, 0.0f };
+        float         rotation[3]  = { 0.0f, 0.0f, 0.0f };
+        float         scale[3]     = { 1.0f, 1.0f, 1.0f };
+        bool          hasSprite2D  = false;
+        float         spriteColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        std::uint32_t textureSlot  = 0;
+        bool          useTexture   = false;
+        float         uvOffset[2]  = { 0.0f, 0.0f };
+        float         uvScale[2]   = { 1.0f, 1.0f };
+        bool          spriteVisible = true;
+    };
+
 
     // ---------------------------------------
     // Smart Pointer types
