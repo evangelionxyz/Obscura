@@ -22,6 +22,11 @@ namespace Obscura
         SceneRenderer() = default;
         ~SceneRenderer() { Shutdown(); }
 
+        SceneRenderer(const SceneRenderer&) = delete;
+        SceneRenderer& operator=(const SceneRenderer&) = delete;
+        SceneRenderer(SceneRenderer&&) noexcept = default;
+        SceneRenderer& operator=(SceneRenderer&&) noexcept = default;
+
         bool Initialize(IRHI* rhi);
         void Shutdown();
 

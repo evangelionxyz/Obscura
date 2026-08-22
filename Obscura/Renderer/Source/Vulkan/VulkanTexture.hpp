@@ -45,8 +45,9 @@ namespace Obscura
         TextureAddressMode addressModeU = TextureAddressMode::Repeat;
         TextureAddressMode addressModeV = TextureAddressMode::Repeat;
         TextureAddressMode addressModeW = TextureAddressMode::Repeat;
-        float maxAnisotropy = 16.0f;
-        bool enableAnisotropy = true;
+        float maxAnisotropy = 1.0f;
+        bool enableAnisotropy = false;
+        bool generateMipmaps = true;
     };
 
     class OBSCURA_RENDERER_API VulkanTexture
@@ -93,6 +94,7 @@ namespace Obscura
         [[nodiscard]] bool IsValid() const noexcept { return m_Image != VK_NULL_HANDLE && m_ImageView != VK_NULL_HANDLE; }
         [[nodiscard]] uint32_t GetWidth() const noexcept { return m_Width; }
         [[nodiscard]] uint32_t GetHeight() const noexcept { return m_Height; }
+        [[nodiscard]] uint32_t GetMipLevels() const noexcept { return m_MipLevels; }
         [[nodiscard]] VkFormat GetFormat() const noexcept { return m_Format; }
         [[nodiscard]] VkImage GetImage() const noexcept { return m_Image; }
         [[nodiscard]] VkImageView GetImageView() const noexcept { return m_ImageView; }

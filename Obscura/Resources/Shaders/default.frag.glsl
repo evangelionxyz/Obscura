@@ -15,7 +15,7 @@ void main()
     vec4 texColor = vec4(1.0);
     if (fragUseTexture != 0u)
     {
-        texColor = texture(u_Textures[nonuniformEXT(fragTextureSlot)], fragTexCoord);
+        texColor = texture(u_Textures[fragTextureSlot], fragTexCoord);
     }
     outColor = fragColor * texColor;
 }

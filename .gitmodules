@@ -16,3 +16,6 @@
 [submodule "Thirdparty/GoogleTest"]
 	path = Thirdparty/GoogleTest
 	url = https://github.com/google/googletest.git
+[submodule "Thirdparty/cppcoro"]
+	path = Thirdparty/cppcoro
+	url = https://github.com/lewissbaker/cppcoro.git

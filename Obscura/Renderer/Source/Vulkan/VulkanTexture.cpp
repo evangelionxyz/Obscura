@@ -1,4 +1,5 @@
 #include "VulkanTexture.hpp"
+#include "MipGenerator.hpp"
 
 #include <Obscura/Logger.hpp>
 #include <Obscura/VFS.hpp>
@@ -122,6 +123,26 @@ namespace Obscura
         m_Height = height;
         m_Format = format;
 
+        // Generate MipChain if requested
+        std::vector<MipLevelData> mipChain;
+        if (pixelData && samplerDesc.generateMipmaps)
+        {
+            uint32_t maxMips = CPUMipGenerator::CalculateMaxMipLevels(width, height);
+            uint32_t bpp = CPUMipGenerator::GetBytesPerPixel(format);
+            uint32_t baseRowPitch = width * bpp;
+            mipChain = CPUMipGenerator::GenerateMipChain(pixelData, width, height, baseRowPitch, format, maxMips);
+            m_MipLevels = static_cast<uint32_t>(mipChain.size());
+        }
+        else
+        {
+            m_MipLevels = 1;
+        }
+
+        if (m_MipLevels == 0)
+        {
+            m_MipLevels = 1;
+        }
+
         // 1. Create VkImage
         VkImageCreateInfo imageInfo{};
         imageInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -129,7 +150,7 @@ namespace Obscura
         imageInfo.extent.width  = width;
         imageInfo.extent.height = height;
         imageInfo.extent.depth  = 1;
-        imageInfo.mipLevels     = 1;
+        imageInfo.mipLevels     = m_MipLevels;
         imageInfo.arrayLayers   = 1;
         imageInfo.format        = format;
         imageInfo.tiling        = VK_IMAGE_TILING_OPTIMAL;
@@ -165,14 +186,29 @@ namespace Obscura
         // 3. Staging buffer copy and transition if pixelData provided
         if (pixelData && commandPool != VK_NULL_HANDLE && queue != VK_NULL_HANDLE)
         {
-            VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4; // 4 bytes per pixel (RGBA8)
+            VkDeviceSize totalStagingSize = 0;
+            std::vector<VkDeviceSize> mipOffsets;
+
+            if (!mipChain.empty())
+            {
+                for (const auto& mip : mipChain)
+                {
+                    mipOffsets.push_back(totalStagingSize);
+                    totalStagingSize += mip.data.size();
+                }
+            }
+            else
+            {
+                totalStagingSize = static_cast<VkDeviceSize>(width) * height * CPUMipGenerator::GetBytesPerPixel(format);
+                mipOffsets.push_back(0);
+            }
 
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
 
             VkBufferCreateInfo bufInfo{};
             bufInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufInfo.size        = imageSize;
+            bufInfo.size        = totalStagingSize;
             bufInfo.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
             bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -203,8 +239,20 @@ namespace Obscura
             vkBindBufferMemory(m_Device, stagingBuffer, stagingMemory, 0);
 
             void* mapped = nullptr;
-            vkMapMemory(m_Device, stagingMemory, 0, imageSize, 0, &mapped);
-            std::memcpy(mapped, pixelData, static_cast<size_t>(imageSize));
+            vkMapMemory(m_Device, stagingMemory, 0, totalStagingSize, 0, &mapped);
+            if (!mipChain.empty())
+            {
+                for (size_t i = 0; i < mipChain.size(); ++i)
+                {
+                    std::memcpy(static_cast<uint8_t*>(mapped) + mipOffsets[i],
+                                mipChain[i].data.data(),
+                                mipChain[i].data.size());
+                }
+            }
+            else
+            {
+                std::memcpy(mapped, pixelData, static_cast<size_t>(totalStagingSize));
+            }
             vkUnmapMemory(m_Device, stagingMemory);
 
             // Execute single-time command buffer for layout transitions and copy
@@ -222,7 +270,7 @@ namespace Obscura
             beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
             vkBeginCommandBuffer(cmd, &beginInfo);
 
-            // Transition: UNDEFINED -> TRANSFER_DST_OPTIMAL
+            // Transition: UNDEFINED -> TRANSFER_DST_OPTIMAL (all mips)
             VkImageMemoryBarrier barrier{};
             barrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             barrier.oldLayout                       = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -232,7 +280,7 @@ namespace Obscura
             barrier.image                           = m_Image;
             barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
             barrier.subresourceRange.baseMipLevel   = 0;
-            barrier.subresourceRange.levelCount     = 1;
+            barrier.subresourceRange.levelCount     = m_MipLevels;
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount     = 1;
             barrier.srcAccessMask                   = 0;
@@ -246,21 +294,44 @@ namespace Obscura
                                  0, nullptr,
                                  1, &barrier);
 
-            // Copy buffer to image
-            VkBufferImageCopy region{};
-            region.bufferOffset                    = 0;
-            region.bufferRowLength                 = 0;
-            region.bufferImageHeight               = 0;
-            region.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-            region.imageSubresource.mipLevel       = 0;
-            region.imageSubresource.baseArrayLayer = 0;
-            region.imageSubresource.layerCount     = 1;
-            region.imageOffset                     = { 0, 0, 0 };
-            region.imageExtent                     = { width, height, 1 };
+            // Copy buffer to image for all mip levels
+            std::vector<VkBufferImageCopy> regions;
+            if (!mipChain.empty())
+            {
+                for (uint32_t i = 0; i < m_MipLevels; ++i)
+                {
+                    VkBufferImageCopy region{};
+                    region.bufferOffset                    = mipOffsets[i];
+                    region.bufferRowLength                 = 0;
+                    region.bufferImageHeight               = 0;
+                    region.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+                    region.imageSubresource.mipLevel       = i;
+                    region.imageSubresource.baseArrayLayer = 0;
+                    region.imageSubresource.layerCount     = 1;
+                    region.imageOffset                     = { 0, 0, 0 };
+                    region.imageExtent                     = { mipChain[i].width, mipChain[i].height, 1 };
+                    regions.push_back(region);
+                }
+            }
+            else
+            {
+                VkBufferImageCopy region{};
+                region.bufferOffset                    = 0;
+                region.bufferRowLength                 = 0;
+                region.bufferImageHeight               = 0;
+                region.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+                region.imageSubresource.mipLevel       = 0;
+                region.imageSubresource.baseArrayLayer = 0;
+                region.imageSubresource.layerCount     = 1;
+                region.imageOffset                     = { 0, 0, 0 };
+                region.imageExtent                     = { width, height, 1 };
+                regions.push_back(region);
+            }
 
-            vkCmdCopyBufferToImage(cmd, stagingBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+            vkCmdCopyBufferToImage(cmd, stagingBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                   static_cast<uint32_t>(regions.size()), regions.data());
 
-            // Transition: TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
+            // Transition: TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL (all mips)
             barrier.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -303,7 +374,7 @@ namespace Obscura
         viewInfo.format                          = format;
         viewInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel   = 0;
-        viewInfo.subresourceRange.levelCount     = 1;
+        viewInfo.subresourceRange.levelCount     = m_MipLevels;
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount     = 1;
 
@@ -341,7 +412,7 @@ namespace Obscura
         samplerInfo.compareEnable           = VK_FALSE;
         samplerInfo.compareOp               = VK_COMPARE_OP_ALWAYS;
         samplerInfo.minLod                  = 0.0f;
-        samplerInfo.maxLod                  = 0.0f;
+        samplerInfo.maxLod                  = static_cast<float>(m_MipLevels > 1 ? (m_MipLevels - 1) : 0);
         samplerInfo.borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
         samplerInfo.unnormalizedCoordinates = VK_FALSE;
 
