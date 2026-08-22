@@ -47,6 +47,15 @@ endforeach()
 # Add Thirdparty dependencies
 add_subdirectory(Thirdparty/spdlog)
 add_subdirectory(Thirdparty/ShaderCompiler)
+add_subdirectory(Thirdparty/glm)
+add_subdirectory(Thirdparty/entt)
+
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/stb")
+
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+add_subdirectory(Thirdparty/GoogleTest)
 
 # Add Subdirectories
 add_subdirectory(Obscura/Core)
@@ -57,3 +66,11 @@ add_subdirectory(Obscura/Plugins/TestPlugin)
 add_subdirectory(Obscura/App)
 add_subdirectory(Obscura/Tests)
 add_subdirectory(Obscura/QtEditor)
+
+# Deploy Resources incrementally (copies only if modified)
+add_custom_target(DeployResources ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/Obscura/Resources"
+        "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/Resources"
+    COMMENT "Deploying Obscura Resources incrementally to binary directory"
+)

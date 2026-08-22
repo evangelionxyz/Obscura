@@ -12,6 +12,6 @@ target_include_directories(Obscura.Core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/Include"
 )
 
-target_link_libraries(Obscura.Core PUBLIC spdlog::spdlog)
+target_link_libraries(Obscura.Core PUBLIC spdlog::spdlog glm::glm EnTT::EnTT)
 
 target_compile_features(Obscura.Core PUBLIC cxx_std_23)

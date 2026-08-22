@@ -25,6 +25,16 @@ namespace Obscura
         bool          isGPUInterop   = false;
     };
 
+    struct FrameContext
+    {
+        void*         commandBuffer      = nullptr; // VkCommandBuffer
+        void*         imageView          = nullptr; // VkImageView for current backbuffer
+        std::uint32_t currentImageIndex  = 0;
+        std::uint32_t width              = 0;
+        std::uint32_t height             = 0;
+        int           format             = 0;       // VkFormat
+    };
+
     struct IRHI
     {
         virtual ~IRHI() = default;
@@ -47,6 +57,10 @@ namespace Obscura
 
         virtual GPUTextureHandle GetGPUTextureHandle() const { return {}; }
         virtual VulkanDeviceObjects GetVulkanDeviceObjects() const { return {}; }
+        virtual FrameContext GetCurrentFrameContext() const { return {}; }
+        virtual const void* GetOffscreenImageView(std::uint32_t index) const { return nullptr; }
+        virtual std::uint32_t GetBackbufferCount() const { return 3; }
+        virtual int GetOffscreenFormat() const { return 0; }
     };
 
 }

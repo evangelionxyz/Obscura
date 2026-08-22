@@ -24,10 +24,9 @@
 
 namespace Obscura
 {
-    // Triple buffered
     static constexpr std::uint32_t BACKBUFFER_COUNT = 3;
 
-    class VulkanRHI : public IRHI
+    class OBSCURA_RENDERER_API VulkanRHI : public IRHI
     {
     public:
         VulkanRHI() = default;
@@ -51,12 +50,18 @@ namespace Obscura
 
         GPUTextureHandle GetGPUTextureHandle() const override;
         VulkanDeviceObjects GetVulkanDeviceObjects() const override;
+        FrameContext GetCurrentFrameContext() const override;
+        const void* GetOffscreenImageView(std::uint32_t index) const override;
+        std::uint32_t GetBackbufferCount() const override { return BACKBUFFER_COUNT; }
+        int GetOffscreenFormat() const override { return static_cast<int>(m_OffscreenFormat); }
 
         [[nodiscard]] VkInstance       GetInstance() const noexcept { return m_Instance; }
         [[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const noexcept { return m_PhysicalDevice; }
         [[nodiscard]] VkDevice         GetDevice() const noexcept { return m_Device; }
         [[nodiscard]] VkQueue          GetGraphicsQueue() const noexcept { return m_GraphicsQueue; }
         [[nodiscard]] std::uint32_t    GetGraphicsQueueFamily() const noexcept { return m_GraphicsQueueFamily; }
+        [[nodiscard]] VkCommandPool    GetCommandPool() const noexcept { return m_CommandPool; }
+        [[nodiscard]] bool             IsDescriptorIndexingSupported() const noexcept { return m_DescriptorIndexingSupported; }
 
     private:
         bool CreateInstance();
@@ -68,8 +73,6 @@ namespace Obscura
         bool CheckValidationLayerSupport(const std::vector<const char*>& layers);
         void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
         void SetupDebugMessenger();
-
-        void RenderOffscreenFrame();
 
     private:
         VkInstance               m_Instance = VK_NULL_HANDLE;
@@ -90,7 +93,7 @@ namespace Obscura
         std::array<VkCommandBuffer, BACKBUFFER_COUNT> m_CommandBuffers{};
         std::array<VkFence, BACKBUFFER_COUNT>         m_RenderFences{};
 
-        // Double-buffered GPU Offscreen Render Targets
+        // Triple-buffered GPU Offscreen Render Targets
         std::array<VkImage, BACKBUFFER_COUNT>         m_OffscreenImages{};
         std::array<VkDeviceMemory, BACKBUFFER_COUNT>  m_OffscreenMemories{};
         std::array<VkImageView, BACKBUFFER_COUNT>     m_OffscreenImageViews{};
@@ -106,6 +109,8 @@ namespace Obscura
         std::vector<std::uint8_t> m_FrameBuffer;
         std::uint32_t    m_FrameCounter = 0;
 
+        bool             m_DescriptorIndexingSupported = false;
         bool             m_Initialized = false;
+        bool             m_FrameActive = false;
     };
 }

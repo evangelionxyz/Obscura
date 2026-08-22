@@ -13,6 +13,9 @@ target_include_directories(Obscura.Tests PRIVATE
 
 target_link_libraries(Obscura.Tests PRIVATE
     Obscura.Core
+    Obscura.Renderer
+    Obscura.Engine
+    GTest::gtest
 )
 
 target_compile_features(Obscura.Tests PUBLIC cxx_std_23)

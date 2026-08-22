@@ -4,3 +4,15 @@
 [submodule "Thirdparty/ShaderCompiler"]
 	path = Thirdparty/ShaderCompiler
 	url = https://github.com/evangelionxyz/Umbra-ShaderCompiler.git
+[submodule "Thirdparty/glm"]
+	path = Thirdparty/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "Thirdparty/entt"]
+	path = Thirdparty/entt
+	url = https://github.com/skypjack/entt.git
+[submodule "Thirdparty/stb"]
+	path = Thirdparty/stb
+	url = https://github.com/nothings/stb.git
+[submodule "Thirdparty/GoogleTest"]
+	path = Thirdparty/GoogleTest
+	url = https://github.com/google/googletest.git

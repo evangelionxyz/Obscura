@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <string>
 
 namespace Obscura
@@ -262,17 +263,82 @@ namespace Obscura
         queueCreateInfo.queueCount = requestedQueues;
         queueCreateInfo.pQueuePriorities = queuePriorities.data();
 
-        VkPhysicalDeviceFeatures deviceFeatures{};
+        // Query device supported features
+        VkPhysicalDeviceVulkan12Features supportedVulkan12Features{};
+        supportedVulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+
+        VkPhysicalDeviceFeatures2 supportedFeatures2{};
+        supportedFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        supportedFeatures2.pNext = &supportedVulkan12Features;
+
+        vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supportedFeatures2);
+
+        VkPhysicalDeviceVulkan12Features enabledVulkan12Features{};
+        enabledVulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        if (supportedVulkan12Features.descriptorIndexing)
+        {
+            enabledVulkan12Features.descriptorIndexing = VK_TRUE;
+        }
+        if (supportedVulkan12Features.descriptorBindingPartiallyBound)
+        {
+            enabledVulkan12Features.descriptorBindingPartiallyBound = VK_TRUE;
+        }
+        if (supportedVulkan12Features.descriptorBindingVariableDescriptorCount)
+        {
+            enabledVulkan12Features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+        }
+        if (supportedVulkan12Features.runtimeDescriptorArray)
+        {
+            enabledVulkan12Features.runtimeDescriptorArray = VK_TRUE;
+        }
+        if (supportedVulkan12Features.shaderSampledImageArrayNonUniformIndexing)
+        {
+            enabledVulkan12Features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+        }
+        if (supportedVulkan12Features.descriptorBindingSampledImageUpdateAfterBind)
+        {
+            enabledVulkan12Features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+        }
+
+        m_DescriptorIndexingSupported = (enabledVulkan12Features.descriptorBindingPartiallyBound == VK_TRUE) &&
+                                        (enabledVulkan12Features.runtimeDescriptorArray == VK_TRUE);
+
+        LOG_INFO("  [VulkanRHI] Vulkan 1.2 Descriptor Indexing Supported: {}",
+            m_DescriptorIndexingSupported ? "YES" : "NO");
 
         std::vector<const char*> deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         };
 
+        uint32_t extCount = 0;
+        vkEnumerateDeviceExtensionProperties(m_PhysicalDevice, nullptr, &extCount, nullptr);
+        std::vector<VkExtensionProperties> availableExtensions(extCount);
+        vkEnumerateDeviceExtensionProperties(m_PhysicalDevice, nullptr, &extCount, availableExtensions.data());
+
+        auto isExtensionAvailable = [&](const char* name) {
+            return std::any_of(availableExtensions.begin(), availableExtensions.end(),
+                [name](const VkExtensionProperties& prop) {
+                    return std::strcmp(prop.extensionName, name) == 0;
+                });
+        };
+
+        if (isExtensionAvailable(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME))
+        {
+            deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+        }
+
+        VkPhysicalDeviceFeatures2 deviceFeatures2{};
+        deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        deviceFeatures2.features.samplerAnisotropy = supportedFeatures2.features.samplerAnisotropy;
+        deviceFeatures2.features.shaderSampledImageArrayDynamicIndexing = supportedFeatures2.features.shaderSampledImageArrayDynamicIndexing;
+        deviceFeatures2.pNext = &enabledVulkan12Features;
+
         VkDeviceCreateInfo deviceCreateInfo{};
         deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
         deviceCreateInfo.queueCreateInfoCount = 1;
-        deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+        deviceCreateInfo.pEnabledFeatures = nullptr;
+        deviceCreateInfo.pNext = &deviceFeatures2;
         deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
@@ -412,6 +478,11 @@ namespace Obscura
 
         LOG_INFO("  [VulkanRHI] Shutting down Vulkan RHI Backend...");
 
+        if (m_Device != VK_NULL_HANDLE)
+        {
+            vkDeviceWaitIdle(m_Device);
+        }
+
         DestroyOffscreenTarget();
 
         if (m_Device != VK_NULL_HANDLE)
@@ -471,7 +542,24 @@ namespace Obscura
         }
         else if (m_RenderMode == RenderMode::Offscreen)
         {
-            RenderOffscreenFrame();
+            if (m_OffscreenImages[0] == VK_NULL_HANDLE || m_Device == VK_NULL_HANDLE)
+            {
+                return;
+            }
+
+            m_FrameCounter++;
+            const std::uint32_t writeIdx = m_WriteIndex;
+
+            vkWaitForFences(m_Device, 1, &m_RenderFences[writeIdx], VK_TRUE, UINT64_MAX);
+            vkResetFences(m_Device, 1, &m_RenderFences[writeIdx]);
+            vkResetCommandBuffer(m_CommandBuffers[writeIdx], 0);
+
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+            vkBeginCommandBuffer(m_CommandBuffers[writeIdx], &beginInfo);
+            m_FrameActive = true;
         }
     }
 
@@ -481,94 +569,23 @@ namespace Obscura
         {
             LOG_TRACE("  [VulkanRHI] End Frame (Queue Present)");
         }
-    }
-
-    void VulkanRHI::RenderOffscreenFrame()
-    {
-        if (m_OffscreenImages[0] == VK_NULL_HANDLE || m_Device == VK_NULL_HANDLE)
+        else if (m_RenderMode == RenderMode::Offscreen && m_FrameActive)
         {
-            return;
+            const std::uint32_t writeIdx = m_WriteIndex;
+
+            vkEndCommandBuffer(m_CommandBuffers[writeIdx]);
+
+            VkSubmitInfo submitInfo{};
+            submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers    = &m_CommandBuffers[writeIdx];
+
+            vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, m_RenderFences[writeIdx]);
+
+            m_ReadIndex  = writeIdx;
+            m_WriteIndex = (writeIdx + 1) % BACKBUFFER_COUNT;
+            m_FrameActive = false;
         }
-
-        m_FrameCounter++;
-
-        const std::uint32_t writeIdx = m_WriteIndex;
-
-        VkResult res = vkWaitForFences(m_Device, 1, &m_RenderFences[writeIdx], VK_TRUE, UINT64_MAX);
-        vkResetFences(m_Device, 1, &m_RenderFences[writeIdx]);
-        vkResetCommandBuffer(m_CommandBuffers[writeIdx], 0);
-
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        vkBeginCommandBuffer(m_CommandBuffers[writeIdx], &beginInfo);
-
-        // Transition image layout to TRANSFER_DST_OPTIMAL for clearing
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = m_CurrentLayouts[writeIdx];
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = m_OffscreenImages[writeIdx];
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-        barrier.srcAccessMask = (m_CurrentLayouts[writeIdx] == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_ACCESS_SHADER_READ_BIT : 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        vkCmdPipelineBarrier(m_CommandBuffers[writeIdx],
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        m_CurrentLayouts[writeIdx] = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
-        VkClearColorValue clearColor = { .float32 = { 0.4f, 0.4f, 0.4f, 1.0f } };
-        VkImageSubresourceRange clearRange{};
-        clearRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        clearRange.baseMipLevel = 0;
-        clearRange.levelCount = 1;
-        clearRange.baseArrayLayer = 0;
-        clearRange.layerCount = 1;
-
-        vkCmdClearColorImage(m_CommandBuffers[writeIdx], m_OffscreenImages[writeIdx],
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &clearRange);
-
-        // Transition back to SHADER_READ_ONLY_OPTIMAL for Qt SceneGraph consumption
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(m_CommandBuffers[writeIdx],
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        m_CurrentLayouts[writeIdx] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        vkEndCommandBuffer(m_CommandBuffers[writeIdx]);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &m_CommandBuffers[writeIdx];
-
-        vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, m_RenderFences[writeIdx]);
-
-        // Double buffering swap
-        m_ReadIndex = writeIdx;
-        m_WriteIndex = (writeIdx + 1) % BACKBUFFER_COUNT;
     }
 
     bool VulkanRHI::CreateOffscreenTarget(std::uint32_t width, std::uint32_t height)
@@ -659,19 +676,59 @@ namespace Obscura
                 return false;
             }
 
-            m_CurrentLayouts[i] = VK_IMAGE_LAYOUT_UNDEFINED;
+            // Transition from UNDEFINED to SHADER_READ_ONLY_OPTIMAL
+            VkCommandBufferAllocateInfo cmdAllocInfo{};
+            cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            cmdAllocInfo.commandPool = m_CommandPool;
+            cmdAllocInfo.commandBufferCount = 1;
+
+            VkCommandBuffer initCmd = VK_NULL_HANDLE;
+            vkAllocateCommandBuffers(m_Device, &cmdAllocInfo, &initCmd);
+
+            VkCommandBufferBeginInfo initBegin{};
+            initBegin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            initBegin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkBeginCommandBuffer(initCmd, &initBegin);
+
+            VkImageMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = m_OffscreenImages[i];
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            vkCmdPipelineBarrier(initCmd,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            vkEndCommandBuffer(initCmd);
+
+            VkSubmitInfo initSubmit{};
+            initSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            initSubmit.commandBufferCount = 1;
+            initSubmit.pCommandBuffers = &initCmd;
+            vkQueueSubmit(m_GraphicsQueue, 1, &initSubmit, VK_NULL_HANDLE);
+            vkQueueWaitIdle(m_GraphicsQueue);
+
+            vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &initCmd);
+
+            m_CurrentLayouts[i] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
 
         m_WriteIndex = 0;
         m_ReadIndex = 0;
         m_FrameBuffer.resize(static_cast<std::size_t>(m_OffscreenWidth) * m_OffscreenHeight * 4, 0);
 
-        // Pre-render both buffers so both start in SHADER_READ_ONLY_OPTIMAL layout
-        for (int i = 0; i < BACKBUFFER_COUNT; ++i)
-        {
-            RenderOffscreenFrame();
-        }
-        vkDeviceWaitIdle(m_Device);
         return true;
     }
 
@@ -709,6 +766,24 @@ namespace Obscura
         m_OffscreenWidth = 0;
         m_OffscreenHeight = 0;
     }
+
+    FrameContext VulkanRHI::GetCurrentFrameContext() const
+    {
+        FrameContext ctx{};
+        ctx.commandBuffer      = m_CommandBuffers[m_WriteIndex];
+        ctx.imageView          = m_OffscreenImageViews[m_WriteIndex];
+        ctx.currentImageIndex  = m_WriteIndex;
+        ctx.width              = m_OffscreenWidth;
+        ctx.height             = m_OffscreenHeight;
+        ctx.format             = static_cast<int>(m_OffscreenFormat);
+        return ctx;
+    }
+
+    const void* VulkanRHI::GetOffscreenImageView(std::uint32_t index) const
+    {
+        return (index < BACKBUFFER_COUNT) ? m_OffscreenImageViews[index] : nullptr;
+    }
+
 
     bool VulkanRHI::ResizeOffscreenTarget(std::uint32_t width, std::uint32_t height)
     {

@@ -1,0 +1,81 @@
+#include <gtest/gtest.h>
+#include <Scene.hpp>
+
+TEST(SceneECSTest, EntityLifecycleAndComponents)
+{
+    Obscura::Scene scene;
+    EXPECT_TRUE(scene.IsEmpty());
+
+    auto e1 = scene.CreateEntity("Player");
+    auto e2 = scene.CreateEntity("Enemy");
+
+    EXPECT_FALSE(scene.IsEmpty());
+    EXPECT_TRUE(scene.HasComponent<Obscura::TagComponent>(e1));
+    EXPECT_TRUE(scene.HasComponent<Obscura::Transform>(e1));
+    EXPECT_EQ(scene.GetComponent<Obscura::TagComponent>(e1).tag, "Player");
+
+    // Add Sprite2D
+    auto& sprite = scene.AddComponent<Obscura::Sprite2D>(e1);
+    sprite.color = glm::vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    sprite.textureSlot = 42;
+    sprite.useTexture = true;
+
+    EXPECT_TRUE(scene.HasComponent<Obscura::Sprite2D>(e1));
+    EXPECT_FALSE(scene.HasComponent<Obscura::Sprite2D>(e2));
+
+    const auto& s = scene.GetComponent<Obscura::Sprite2D>(e1);
+    EXPECT_EQ(s.textureSlot, 42u);
+    EXPECT_TRUE(s.useTexture);
+    EXPECT_FLOAT_EQ(s.color.r, 1.0f);
+    EXPECT_FLOAT_EQ(s.color.g, 0.5f);
+
+    scene.DestroyEntity(e2);
+    EXPECT_FALSE(scene.GetRegistry().valid(e2));
+
+    scene.Clear();
+    EXPECT_TRUE(scene.IsEmpty());
+}
+
+TEST(SceneECSTest, TransformMatrixComputation)
+{
+    Obscura::Transform transform;
+    transform.position = glm::vec3(10.0f, 20.0f, 30.0f);
+    transform.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+    transform.scale    = glm::vec3(2.0f, 3.0f, 4.0f);
+
+    glm::mat4 mat = transform.GetTransformMatrix();
+    glm::vec4 localPoint(1.0f, 1.0f, 1.0f, 1.0f);
+    glm::vec4 worldPoint = mat * localPoint;
+
+    EXPECT_FLOAT_EQ(worldPoint.x, 12.0f); // 1*2 + 10
+    EXPECT_FLOAT_EQ(worldPoint.y, 23.0f); // 1*3 + 20
+    EXPECT_FLOAT_EQ(worldPoint.z, 34.0f); // 1*4 + 30
+    EXPECT_FLOAT_EQ(worldPoint.w, 1.0f);
+}
+
+TEST(SceneECSTest, EnTTRuntimeViewIteration)
+{
+    Obscura::Scene scene;
+    for (int i = 0; i < 10; ++i)
+    {
+        auto entity = scene.CreateEntity("Sprite_" + std::to_string(i));
+        auto& t = scene.GetComponent<Obscura::Transform>(entity);
+        t.position.x = static_cast<float>(i * 10);
+
+        if (i % 2 == 0)
+        {
+            auto& s = scene.AddComponent<Obscura::Sprite2D>(entity);
+            s.textureSlot = i;
+        }
+    }
+
+    const auto view = scene.GetRegistry().view<Obscura::Transform, Obscura::Sprite2D>();
+    size_t count = 0;
+    for (auto entity : view)
+    {
+        const auto& [t, s] = view.get<Obscura::Transform, Obscura::Sprite2D>(entity);
+        EXPECT_EQ(s.textureSlot % 2, 0u);
+        count++;
+    }
+    EXPECT_EQ(count, 5u);
+}

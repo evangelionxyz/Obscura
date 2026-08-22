@@ -15,9 +15,11 @@ target_include_directories(Obscura.Renderer
 )
 
 target_link_libraries(Obscura.Renderer
-    PRIVATE
+    PUBLIC
         Obscura.Core
         Vulkan::Vulkan
+        UmbraCompiler
+        stb
 )
 
 target_compile_definitions(Obscura.Renderer PRIVATE OBSCURA_RENDERER_EXPORTS)

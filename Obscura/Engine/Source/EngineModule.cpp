@@ -5,7 +5,11 @@
 #include <Obscura/Module.hpp>
 #include <Obscura/Types.hpp>
 
+#include "Scene.hpp"
+#include "SceneRenderer.hpp"
+
 #include <filesystem>
+#include <memory>
 
 namespace
 {
@@ -63,12 +67,36 @@ public:
         }
 
         LOG_INFO("[Engine.dll] Attached RHI Backend: {}", m_RHI->GetName());
+
+        // Initialize Engine SceneRenderer
+        m_SceneRenderer = std::make_unique<Obscura::SceneRenderer>();
+        if (!m_SceneRenderer->Initialize(m_RHI))
+        {
+            LOG_WARN("[Engine.dll] SceneRenderer failed to initialize — scene draws will be disabled.");
+        }
+        else
+        {
+            // Populate default sprite entity
+            auto entity = m_Scene.CreateEntity("DefaultSprite");
+            auto& sprite = m_Scene.AddComponent<Obscura::Sprite2D>(entity);
+            sprite.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+            sprite.useTexture = false;
+            LOG_INFO("[Engine.dll] Default sprite entity added to scene.");
+        }
+
         LOG_INFO("[Engine.dll] Engine initialized successfully.");
         return true;
     }
 
     void Shutdown() override
     {
+        if (m_SceneRenderer)
+        {
+            m_SceneRenderer->Shutdown();
+            m_SceneRenderer.reset();
+        }
+        m_Scene.Clear();
+
         if (m_RHI)
         {
             LOG_INFO("[Engine.dll] Shutting down Engine...");
@@ -93,6 +121,12 @@ public:
         if (m_RHI)
         {
             m_RHI->BeginFrame();
+
+            if (m_SceneRenderer && m_SceneRenderer->IsValid())
+            {
+                m_SceneRenderer->Render(m_Scene, m_RHI);
+            }
+
             m_RHI->EndFrame();
         }
     }
@@ -113,11 +147,14 @@ public:
     }
 
 private:
-    Obscura::EngineInitParams m_Params{};
-    Obscura::Module           m_RhiModule;
-    Obscura::IRHI*            m_RHI          = nullptr;
-    Obscura::DestroyRHIFn     m_DestroyRHIFn = nullptr;
-    uint32_t                  m_FrameCount   = 0;
+    Obscura::EngineInitParams                  m_Params{};
+    Obscura::Module                            m_RhiModule;
+    Obscura::IRHI*                             m_RHI          = nullptr;
+    Obscura::DestroyRHIFn                      m_DestroyRHIFn = nullptr;
+    uint32_t                                   m_FrameCount   = 0;
+
+    Obscura::Scene                             m_Scene;
+    std::unique_ptr<Obscura::SceneRenderer>    m_SceneRenderer;
 };
 
 } // anonymous namespace

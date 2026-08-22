@@ -1,7 +1,11 @@
-#include <iostream>
+#include <gtest/gtest.h>
+#include <Obscura/Logger.hpp>
 
-int main()
+int main(int argc, char** argv)
 {
-    std::cout << "Unit Test\n";
-    return 0;
+    Obscura::Logger::Init();
+    ::testing::InitGoogleTest(&argc, argv);
+    int result = RUN_ALL_TESTS();
+    Obscura::Logger::Shutdown();
+    return result;
 }

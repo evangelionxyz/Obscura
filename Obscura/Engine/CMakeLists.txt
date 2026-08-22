@@ -13,6 +13,8 @@ target_include_directories(Obscura.Engine PUBLIC
 
 target_link_libraries(Obscura.Engine PRIVATE
     Obscura.Core
+    Obscura.Renderer
+    EnTT::EnTT
 )
 
 target_compile_definitions(Obscura.Engine PRIVATE OBSCURA_ENGINE_EXPORTS)
