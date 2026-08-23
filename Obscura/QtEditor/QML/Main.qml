@@ -76,7 +76,7 @@ ApplicationWindow {
             // Bottom Panel: Console Log
             Rectangle {
                 id: consolePanel
-                SplitView.preferredHeight: 150
+                SplitView.preferredHeight: 240
                 SplitView.minimumHeight: 60
                 color: "#14171d"
                 border.color: "#282c37"
@@ -163,7 +163,7 @@ ApplicationWindow {
                                 id: filterInfoBtn
                                 property bool checked: true
                                 implicitWidth: infoRow.implicitWidth + 10
-                                implicitHeight: 20
+                                implicitHeight: 24
                                 radius: 3
                                 color: checked ? "#1e2c44" : (infoMouse.containsMouse ? "#202532" : "transparent")
                                 border.color: checked ? "#3b82f6" : "#333b4d"
@@ -188,12 +188,13 @@ ApplicationWindow {
                                             id: infoCountText
                                             anchors.centerIn: parent
                                             text: consolePanel.infoCount.toString()
-                                            font.pixelSize: 9
+                                            font.pixelSize: 10
                                             font.bold: true
                                             color: filterInfoBtn.checked ? "#ffffff" : "#a0aec0"
                                         }
                                     }
                                 }
+
                                 MouseArea {
                                     id: infoMouse
                                     anchors.fill: parent
