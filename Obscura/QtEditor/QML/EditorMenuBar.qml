@@ -1,10 +1,46 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 
 MenuBar {
     id: root
     implicitHeight: 28
     spacing: 1
+
+    FileDialog {
+        id: openSceneDialog
+        title: qsTr("Open Scene")
+        nameFilters: ["Obscura Scene (*.json)", "All Files (*)"]
+        fileMode: FileDialog.OpenFile
+        onAccepted: {
+            var path = selectedFile.toString();
+            if (path.indexOf("file:///") === 0) {
+                path = path.substring(8);
+            } else if (path.indexOf("file://") === 0) {
+                path = path.substring(7);
+            }
+            EditorApp.loadScene(path);
+        }
+    }
+
+    FileDialog {
+        id: saveSceneDialog
+        title: qsTr("Save Scene As")
+        nameFilters: ["Obscura Scene (*.json)", "All Files (*)"]
+        fileMode: FileDialog.SaveFile
+        onAccepted: {
+            var path = selectedFile.toString();
+            if (path.indexOf("file:///") === 0) {
+                path = path.substring(8);
+            } else if (path.indexOf("file://") === 0) {
+                path = path.substring(7);
+            }
+            if (!path.toLowerCase().endsWith(".json")) {
+                path += ".json";
+            }
+            EditorApp.saveSceneAs(path);
+        }
+    }
 
     delegate: MenuBarItem {
         id: menuBarItem
@@ -42,22 +78,28 @@ MenuBar {
         Action {
             text: qsTr("New Scene")
             shortcut: StandardKey.New
-            onTriggered: console.log("[UI] New Scene triggered")
+            onTriggered: EditorApp.newScene()
         }
         Action {
             text: qsTr("Open Scene...")
             shortcut: StandardKey.Open
-            onTriggered: console.log("[UI] Open Scene triggered")
+            onTriggered: openSceneDialog.open()
         }
         Action {
             text: qsTr("Save")
             shortcut: StandardKey.Save
-            onTriggered: console.log("[UI] Save Scene triggered")
+            onTriggered: {
+                if (EditorApp.currentScenePath && EditorApp.currentScenePath !== "") {
+                    EditorApp.saveScene();
+                } else {
+                    saveSceneDialog.open();
+                }
+            }
         }
         Action {
             text: qsTr("Save &As...")
             shortcut: StandardKey.SaveAs
-            onTriggered: console.log("[UI] Save As triggered")
+            onTriggered: saveSceneDialog.open()
         }
         MenuSeparator {}
         Action {

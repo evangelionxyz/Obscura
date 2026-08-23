@@ -189,6 +189,77 @@ namespace ObscuraEditor
         QCoreApplication::quit();
     }
 
+    bool EditorApplication::newScene()
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        m_Engine->NewScene();
+        m_CurrentScenePath.clear();
+        emit scenePathChanged();
+        emit sceneEntitiesChanged();
+        emit logMessage("[Host] Created new empty scene.");
+        return true;
+    }
+
+    bool EditorApplication::saveScene(const QString &filePath)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        QString targetPath = filePath.isEmpty() ? m_CurrentScenePath : filePath;
+        if (targetPath.isEmpty())
+        {
+            return false;
+        }
+
+        std::string stdPath = targetPath.toStdString();
+        bool success = m_Engine->SaveScene(stdPath.c_str());
+        if (success)
+        {
+            m_CurrentScenePath = targetPath;
+            emit scenePathChanged();
+            emit logMessage(QString("[Host] Scene successfully saved to: %1").arg(targetPath));
+        }
+        else
+        {
+            emit logMessage(QString("[Host] Failed to save scene to: %1").arg(targetPath), 4);
+        }
+        return success;
+    }
+
+    bool EditorApplication::saveSceneAs(const QString &filePath)
+    {
+        return saveScene(filePath);
+    }
+
+    bool EditorApplication::loadScene(const QString &filePath)
+    {
+        if (!m_Engine || filePath.isEmpty())
+        {
+            return false;
+        }
+
+        std::string stdPath = filePath.toStdString();
+        bool success = m_Engine->LoadScene(stdPath.c_str());
+        if (success)
+        {
+            m_CurrentScenePath = filePath;
+            emit scenePathChanged();
+            emit sceneEntitiesChanged();
+            emit logMessage(QString("[Host] Scene successfully loaded from: %1").arg(filePath));
+        }
+        else
+        {
+            emit logMessage(QString("[Host] Failed to load scene from: %1").arg(filePath), 4);
+        }
+        return success;
+    }
+
     void EditorApplication::onViewportAspectResized(std::uint32_t width, std::uint32_t height)
     {
         if (width == 0 || height == 0)

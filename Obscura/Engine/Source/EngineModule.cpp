@@ -7,6 +7,7 @@
 
 #include <Obscura/WorkerManager.hpp>
 #include "Assets/AssetManager.hpp"
+#include "Assets/Serializer.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/EditorCamera.hpp"
 
@@ -475,6 +476,38 @@ public:
             return 3; // Failed
         }
         return 0;
+    }
+
+    bool SaveScene(const char* filePath) override
+    {
+        if (!filePath || filePath[0] == '\0') return false;
+        Obscura::SceneSerializer serializer(&m_Scene);
+        return serializer.Serialize(filePath);
+    }
+
+    bool LoadScene(const char* filePath) override
+    {
+        if (!filePath || filePath[0] == '\0') return false;
+        Obscura::SceneSerializer serializer(&m_Scene);
+        bool success = serializer.Deserialize(filePath);
+        if (success)
+        {
+            auto view = m_Scene.GetRegistry().view<Obscura::Sprite2D>();
+            for (auto entity : view)
+            {
+                auto& sprite = view.get<Obscura::Sprite2D>(entity);
+                if (!sprite.texturePath.empty())
+                {
+                    sprite.textureHandle = LoadTexture(sprite.texturePath.c_str());
+                }
+            }
+        }
+        return success;
+    }
+
+    void NewScene() override
+    {
+        m_Scene.Clear();
     }
 
 private:

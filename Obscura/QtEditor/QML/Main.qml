@@ -11,7 +11,9 @@ ApplicationWindow {
     minimumWidth: 1024
     minimumHeight: 600
     visible: true
-    title: qsTr("Obscura Engine Editor - [Unsaved Scene]")
+    title: (EditorApp.currentScenePath && EditorApp.currentScenePath !== "") 
+           ? `Obscura Engine Editor - [${EditorApp.currentScenePath}]` 
+           : qsTr("Obscura Engine Editor - [Untitled Scene]")
 
     Material.theme: Material.Dark
     Material.accent: "#6c8dfa"

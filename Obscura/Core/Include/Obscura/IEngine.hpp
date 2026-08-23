@@ -39,6 +39,11 @@ namespace Obscura
         virtual bool          SetEntityTexture(std::uint64_t uuid, const char* filePath) = 0;
         virtual AssetHandle   LoadTexture(const char* filePath) = 0;
         virtual std::uint32_t GetEntityTextureState(std::uint64_t uuid) const = 0;
+
+        // Scene Serialization & Lifecycle
+        virtual bool SaveScene(const char* filePath) = 0;
+        virtual bool LoadScene(const char* filePath) = 0;
+        virtual void NewScene() = 0;
     };
 
 

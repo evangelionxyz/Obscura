@@ -16,6 +16,7 @@ target_link_libraries(Obscura.Tests PRIVATE
     Obscura.Renderer
     Obscura.Engine
     GTest::gtest
+    nlohmann_json
 )
 
 target_compile_features(Obscura.Tests PUBLIC cxx_std_23)

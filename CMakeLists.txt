@@ -75,6 +75,9 @@ add_subdirectory(Thirdparty/cppcoro)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/stb")
 
+add_library(nlohmann_json INTERFACE)
+target_include_directories(nlohmann_json INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/nlohmann" "${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty")
+
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
 add_subdirectory(Thirdparty/GoogleTest)

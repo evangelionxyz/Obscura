@@ -16,6 +16,7 @@ target_link_libraries(Obscura.Engine PRIVATE
     Obscura.Renderer
     EnTT::EnTT
     stb
+    nlohmann_json
 )
 
 target_compile_definitions(Obscura.Engine PRIVATE OBSCURA_ENGINE_EXPORTS)

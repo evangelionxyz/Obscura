@@ -35,6 +35,7 @@ namespace ObscuraEditor
         Q_PROPERTY(quint64 frameCount READ getFrameCount NOTIFY statsUpdated)
         Q_PROPERTY(bool isEngineRunning READ isEngineRunning NOTIFY engineInitialized)
         Q_PROPERTY(bool vsyncEnabled READ isVsyncEnabled WRITE setVsyncEnabled NOTIFY vsyncChanged)
+        Q_PROPERTY(QString currentScenePath READ getCurrentScenePath NOTIFY scenePathChanged)
 
     public:
         explicit EditorApplication(QObject *parent = nullptr);
@@ -43,6 +44,13 @@ namespace ObscuraEditor
         Q_INVOKABLE bool initialize(const QString &engineDllPath = QString());
         Q_INVOKABLE void shutdown();
         Q_INVOKABLE void requestExit();
+
+        // Scene Serialization & Management
+        Q_INVOKABLE bool newScene();
+        Q_INVOKABLE bool saveScene(const QString &filePath = QString());
+        Q_INVOKABLE bool saveSceneAs(const QString &filePath);
+        Q_INVOKABLE bool loadScene(const QString &filePath);
+        [[nodiscard]] QString getCurrentScenePath() const { return m_CurrentScenePath; }
 
         // Entity ECS manipulation
         Q_INVOKABLE QVariantList getEntityList();
@@ -82,6 +90,7 @@ namespace ObscuraEditor
         void engineInitialized(bool success);
         void statsUpdated();
         void vsyncChanged();
+        void scenePathChanged();
         void logMessage(const QString &message, int level = 2);
         void sceneEntitiesChanged();
         void entityUpdated(const QString &uuidHex);
@@ -101,6 +110,7 @@ namespace ObscuraEditor
 
         QString                m_EngineVersion = "N/A";
         QString                m_RhiName       = "N/A";
+        QString                m_CurrentScenePath = "";
         double                 m_CurrentFps    = 0.0;
         double                 m_FrameTime     = 0.0;
         quint64                m_FrameCount    = 0;
