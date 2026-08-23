@@ -2,43 +2,84 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import Obscura.Editor 1.0
 import ".."
 
 ComponentBase {
     id: root
     title: "Sprite 2D"
+    removable: true
 
     property real colorR: 1.0
     property real colorG: 1.0
     property real colorB: 1.0
     property real colorA: 1.0
 
-    property int textureSlot: 0
-    property bool useTexture: false
+    property string textureHandle: "0x0000000000000000"
+    property string texturePath: ""
+    property int textureState: 0 // 0=Unloaded, 1=Loading, 2=Ready, 3=Failed
+
     property real uvOffsetX: 0.0
     property real uvOffsetY: 0.0
     property real uvScaleX: 1.0
     property real uvScaleY: 1.0
     property bool spriteVisible: true
 
-    property var availableTextures: []
+    property bool updating: false
 
     signal spriteChanged()
+    signal textureSelected(string filePath)
 
-    function refreshTextures() {
-        root.availableTextures = EditorApp.getAvailableTextures();
+    function loadFromEntity(entity) {
+        if (!entity) return;
+        root.updating = true;
+        root.colorR = (entity.colorR !== undefined) ? entity.colorR : 1.0;
+        root.colorG = (entity.colorG !== undefined) ? entity.colorG : 1.0;
+        root.colorB = (entity.colorB !== undefined) ? entity.colorB : 1.0;
+        root.colorA = (entity.colorA !== undefined) ? entity.colorA : 1.0;
+        root.textureHandle = (entity.textureHandle !== undefined) ? entity.textureHandle : "0x0000000000000000";
+        root.texturePath = (entity.texturePath !== undefined) ? entity.texturePath : "";
+        root.textureState = (entity.textureState !== undefined) ? entity.textureState : 0;
+        root.uvOffsetX = (entity.uvOffsetX !== undefined) ? entity.uvOffsetX : 0.0;
+        root.uvOffsetY = (entity.uvOffsetY !== undefined) ? entity.uvOffsetY : 0.0;
+        root.uvScaleX = (entity.uvScaleX !== undefined) ? entity.uvScaleX : 1.0;
+        root.uvScaleY = (entity.uvScaleY !== undefined) ? entity.uvScaleY : 1.0;
+        root.spriteVisible = (entity.spriteVisible !== undefined) ? entity.spriteVisible : true;
+
+        uvOffsetFloat3.setValues(root.uvOffsetX, root.uvOffsetY, 0.0);
+        uvScaleFloat3.setValues(root.uvScaleX, root.uvScaleY, 1.0);
+
+        root.updating = false;
     }
 
-    Component.onCompleted: {
-        root.refreshTextures();
+    function emitSpriteChanged() {
+        if (!root.updating) {
+            root.spriteChanged();
+        }
+    }
+
+    FileDialog {
+        id: textureFileDialog
+        title: "Select Sprite Texture"
+        nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp *.tga)", "All files (*)"]
+        onAccepted: {
+            var selected = selectedFile.toString();
+            if (selected.startsWith("file:///")) {
+                selected = selected.substring(8);
+            } else if (selected.startsWith("file://")) {
+                selected = selected.substring(7);
+            }
+            root.texturePath = selected;
+            root.textureSelected(selected);
+        }
     }
 
     ColumnLayout {
         Layout.fillWidth: true
         spacing: 8
 
-        // Row 1: Visibility and Texture Mode Toggles
+        // Row 1: Visibility Toggle & State Badge
         RowLayout {
             Layout.fillWidth: true
             spacing: 12
@@ -50,20 +91,54 @@ ComponentBase {
                 font.pixelSize: 11
                 Material.accent: "#6c8dfa"
                 onToggled: {
+                    if (root.updating) return;
                     root.spriteVisible = checked;
-                    root.spriteChanged();
+                    root.emitSpriteChanged();
                 }
             }
 
-            CheckBox {
-                id: textureCheck
-                text: "Enable Texture"
-                checked: root.useTexture
-                font.pixelSize: 11
-                Material.accent: "#6c8dfa"
-                onToggled: {
-                    root.useTexture = checked;
-                    root.spriteChanged();
+            Item { Layout.fillWidth: true }
+
+            // Texture status badge
+            Rectangle {
+                implicitHeight: 18
+                implicitWidth: statusLabel.contentWidth + 10
+                radius: 3
+                color: {
+                    if (!root.texturePath || root.texturePath.length === 0) return "#242833";
+                    if (root.textureState === 2) return "#1e3a29";
+                    if (root.textureState === 1) return "#3a301e";
+                    if (root.textureState === 3) return "#3a1e1e";
+                    return "#242833";
+                }
+                border.color: {
+                    if (!root.texturePath || root.texturePath.length === 0) return "#2d3340";
+                    if (root.textureState === 2) return "#38ef7d";
+                    if (root.textureState === 1) return "#eab308";
+                    if (root.textureState === 3) return "#ef4444";
+                    return "#2d3340";
+                }
+                border.width: 1
+
+                Label {
+                    id: statusLabel
+                    anchors.centerIn: parent
+                    text: {
+                        if (!root.texturePath || root.texturePath.length === 0) return "NO TEXTURE (TINT)";
+                        if (root.textureState === 2) return "TEXTURE READY";
+                        if (root.textureState === 1) return "LOADING...";
+                        if (root.textureState === 3) return "LOAD FAILED";
+                        return "CUSTOM TEXTURE";
+                    }
+                    font.pixelSize: 9
+                    font.bold: true
+                    color: {
+                        if (!root.texturePath || root.texturePath.length === 0) return "#718096";
+                        if (root.textureState === 2) return "#38ef7d";
+                        if (root.textureState === 1) return "#eab308";
+                        if (root.textureState === 3) return "#ef4444";
+                        return "#cbd5e0";
+                    }
                 }
             }
         }
@@ -165,7 +240,7 @@ ComponentBase {
                                 root.colorG = c.g;
                                 root.colorB = c.b;
                                 root.colorA = 1.0;
-                                root.spriteChanged();
+                                root.emitSpriteChanged();
                             }
                         }
                     }
@@ -173,11 +248,10 @@ ComponentBase {
             }
         }
 
-        // Row 3: Texture Preview & Selector
+        // Row 3: Texture File Picker & Preview Card
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 6
-            visible: root.useTexture
 
             RowLayout {
                 Layout.fillWidth: true
@@ -190,35 +264,50 @@ ComponentBase {
                     font.pixelSize: 11
                 }
 
-                ComboBox {
-                    id: textureCombo
+                Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 26
-                    font.pixelSize: 11
-                    model: {
-                        var names = [];
-                        for (var i = 0; i < root.availableTextures.length; ++i) {
-                            var path = root.availableTextures[i];
-                            var filename = path.substring(path.lastIndexOf('/') + 1);
-                            names.push(`Slot ${i}: ${filename}`);
-                        }
-                        return names.length > 0 ? names : ["No textures found in Resources/Textures"];
-                    }
-                    currentIndex: (root.textureSlot >= 0 && root.textureSlot < root.availableTextures.length) ? root.textureSlot : 0
+                    height: 24
+                    color: "#14171d"
+                    border.color: "#242833"
+                    border.width: 1
+                    radius: 2
+                    clip: true
 
-                    onActivated: (index) => {
-                        root.textureSlot = index;
-                        root.spriteChanged();
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
+
+                        Text {
+                            text: root.texturePath.length > 0 ? root.texturePath : "None (Solid Color Tint)"
+                            font.pixelSize: 10
+                            font.family: "Consolas, monospace"
+                            color: root.texturePath.length > 0 ? "#cbd5e0" : "#718096"
+                            elide: Text.ElideMiddle
+                            Layout.fillWidth: true
+                        }
                     }
                 }
 
+                Button {
+                    text: "Browse..."
+                    implicitHeight: 24
+                    font.pixelSize: 10
+                    onClicked: textureFileDialog.open()
+                }
+
                 ToolButton {
-                    text: "↻"
+                    visible: root.texturePath.length > 0
+                    text: "✕"
                     implicitHeight: 24
                     implicitWidth: 24
+                    font.pixelSize: 10
                     ToolTip.visible: hovered
-                    ToolTip.text: "Reload Textures"
-                    onClicked: root.refreshTextures()
+                    ToolTip.text: "Clear Texture"
+                    onClicked: {
+                        root.texturePath = "";
+                        root.textureSelected("");
+                    }
                 }
             }
 
@@ -232,7 +321,7 @@ ComponentBase {
                 radius: 4
                 clip: true
 
-                // Background checkerboard for transparent textures
+                // Background checkerboard pattern for transparent textures
                 Rectangle {
                     anchors.fill: parent
                     color: "#151820"
@@ -244,7 +333,7 @@ ComponentBase {
                     width: parent.width - 12
                     height: parent.height - 12
                     fillMode: Image.PreserveAspectFit
-                    source: (root.textureSlot >= 0 && root.textureSlot < root.availableTextures.length) ? root.availableTextures[root.textureSlot] : ""
+                    source: root.texturePath.length > 0 ? ("file:///" + root.texturePath) : ""
                     asynchronous: true
                     sourceSize: Qt.size(256, 256)
                     smooth: true
@@ -254,7 +343,7 @@ ComponentBase {
                 // Empty / Loading state placeholder
                 ColumnLayout {
                     anchors.centerIn: parent
-                    visible: texturePreviewImage.status !== Image.Ready
+                    visible: root.texturePath.length === 0 || texturePreviewImage.status !== Image.Ready
                     spacing: 4
 
                     BusyIndicator {
@@ -266,7 +355,12 @@ ComponentBase {
                     }
 
                     Label {
-                        text: texturePreviewImage.status === Image.Loading ? "Loading Preview..." : "No Texture Loaded"
+                        text: {
+                            if (root.texturePath.length === 0) return "No Texture (Renders Solid Tint)";
+                            if (texturePreviewImage.status === Image.Loading) return "Loading Texture...";
+                            if (texturePreviewImage.status === Image.Error) return "Failed to Load Image";
+                            return "Ready";
+                        }
                         font.pixelSize: 10
                         color: "#718096"
                         Layout.alignment: Qt.AlignHCenter
@@ -282,7 +376,7 @@ ComponentBase {
                     width: textureMetaLabel.contentWidth + 8
                     color: "#cc1a1d24"
                     radius: 2
-                    visible: texturePreviewImage.status === Image.Ready
+                    visible: texturePreviewImage.status === Image.Ready && root.texturePath.length > 0
 
                     Label {
                         id: textureMetaLabel
@@ -298,26 +392,30 @@ ComponentBase {
 
         // Row 4: UV Coordinates (Offset & Scale)
         Float3 {
+            id: uvOffsetFloat3
             label: "UV Offset"
             valueX: root.uvOffsetX
             valueY: root.uvOffsetY
             valueZ: 0.0
             onValuesChanged: (x, y, z) => {
+                if (root.updating) return;
                 root.uvOffsetX = x;
                 root.uvOffsetY = y;
-                root.spriteChanged();
+                root.emitSpriteChanged();
             }
         }
 
         Float3 {
+            id: uvScaleFloat3
             label: "UV Scale"
             valueX: root.uvScaleX
             valueY: root.uvScaleY
             valueZ: 1.0
             onValuesChanged: (x, y, z) => {
+                if (root.updating) return;
                 root.uvScaleX = x;
                 root.uvScaleY = y;
-                root.spriteChanged();
+                root.emitSpriteChanged();
             }
         }
     }
@@ -366,7 +464,7 @@ ComponentBase {
                     Layout.fillWidth: true
                     from: 0.0; to: 1.0
                     value: root.colorR
-                    onMoved: { root.colorR = value; root.spriteChanged(); }
+                    onMoved: { root.colorR = value; root.emitSpriteChanged(); }
                 }
                 Label { text: root.colorR.toFixed(2); font.pixelSize: 10; color: "#cbd5e0"; font.family: "Consolas" }
             }
@@ -379,7 +477,7 @@ ComponentBase {
                     Layout.fillWidth: true
                     from: 0.0; to: 1.0
                     value: root.colorG
-                    onMoved: { root.colorG = value; root.spriteChanged(); }
+                    onMoved: { root.colorG = value; root.emitSpriteChanged(); }
                 }
                 Label { text: root.colorG.toFixed(2); font.pixelSize: 10; color: "#cbd5e0"; font.family: "Consolas" }
             }
@@ -392,7 +490,7 @@ ComponentBase {
                     Layout.fillWidth: true
                     from: 0.0; to: 1.0
                     value: root.colorB
-                    onMoved: { root.colorB = value; root.spriteChanged(); }
+                    onMoved: { root.colorB = value; root.emitSpriteChanged(); }
                 }
                 Label { text: root.colorB.toFixed(2); font.pixelSize: 10; color: "#cbd5e0"; font.family: "Consolas" }
             }
@@ -405,7 +503,7 @@ ComponentBase {
                     Layout.fillWidth: true
                     from: 0.0; to: 1.0
                     value: root.colorA
-                    onMoved: { root.colorA = value; root.spriteChanged(); }
+                    onMoved: { root.colorA = value; root.emitSpriteChanged(); }
                 }
                 Label { text: root.colorA.toFixed(2); font.pixelSize: 10; color: "#cbd5e0"; font.family: "Consolas" }
             }

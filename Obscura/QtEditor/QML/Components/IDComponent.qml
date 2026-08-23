@@ -6,12 +6,25 @@ import QtQuick.Layouts
 ComponentBase {
     id: root
     title: "Identity & Hierarchy"
+    removable: false
 
     property string uuid: "0x0000000000000000"
     property string entityName: "Entity"
     property string parentUuid: "0x0000000000000000"
 
     signal nameChanged(string newName)
+
+    function loadFromEntity(entity) {
+        if (!entity || !entity.uuid) {
+            root.uuid = "0x0000000000000000";
+            root.entityName = "Entity";
+            root.parentUuid = "0x0000000000000000";
+            return;
+        }
+        root.uuid = entity.uuid;
+        root.entityName = entity.name !== undefined ? entity.name : "Entity";
+        root.parentUuid = entity.parentUuid !== undefined ? entity.parentUuid : "0x0000000000000000";
+    }
 
     ColumnLayout {
         Layout.fillWidth: true

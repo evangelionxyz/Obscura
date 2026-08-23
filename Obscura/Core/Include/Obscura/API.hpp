@@ -11,6 +11,13 @@
     #define OBSCURA_DLL_IMPORT
 #endif
 
+// --- Core ---
+#if defined(OBSCURA_CORE_EXPORTS)
+    #define OBSCURA_CORE_API OBSCURA_DLL_EXPORT
+#else
+    #define OBSCURA_CORE_API OBSCURA_DLL_IMPORT
+#endif
+
 // --- Engine ---
 #if defined(OBSCURA_ENGINE_EXPORTS)
     #define OBSCURA_ENGINE_API OBSCURA_DLL_EXPORT

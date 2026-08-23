@@ -1,6 +1,8 @@
 #pragma once
 
+#include <Obscura/API.hpp>
 #include <fstream>
+#include <functional>
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -25,7 +27,9 @@ namespace Obscura
         std::string message;
     };
 
-    class Logger
+    using LogCallback = std::function<void(spdlog::level::level_enum level, const std::string &message)>;
+
+    class OBSCURA_CORE_API Logger
     {
     public:
         static void Init();
@@ -35,6 +39,8 @@ namespace Obscura
         static const std::vector<LogMessage> &GetLogs();
         static void ClearLogs();
         static void PushLog(spdlog::level::level_enum level, const std::string &message);
+        static void SetCallback(LogCallback callback);
+        static void ClearCallback();
     };
 }
 

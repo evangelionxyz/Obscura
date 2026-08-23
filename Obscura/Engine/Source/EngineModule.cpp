@@ -11,10 +11,13 @@
 #include "Scene/EditorCamera.hpp"
 
 #include "Renderer/SceneRenderer.hpp"
+#include "Vulkan/VulkanTexture.hpp"
+#include "Vulkan/VulkanBindlessSystem.hpp"
 
 #include <filesystem>
 #include <memory>
 #include <algorithm>
+#include <unordered_map>
 
 namespace
 {
@@ -89,12 +92,9 @@ public:
         }
         else
         {
-            // Populate default sprite entity
-            auto entity = m_Scene.CreateEntity("DefaultSprite");
-            auto& sprite = m_Scene.AddComponent<Obscura::Sprite2D>(entity);
-            sprite.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-            sprite.useTexture = false;
-            LOG_INFO("[Engine.dll] Default sprite entity added to scene.");
+            // Populate default empty entity
+            auto entity = m_Scene.CreateEntity("Entity_1");
+            LOG_INFO("[Engine.dll] Default entity added to scene.");
         }
 
         LOG_INFO("[Engine.dll] Engine initialized successfully.");
@@ -109,6 +109,8 @@ public:
             m_SceneRenderer.reset();
         }
         m_Scene.Clear();
+
+        m_GpuTextures.clear();
 
         if (m_RHI)
         {
@@ -153,6 +155,12 @@ public:
 
             m_RHI->EndFrame();
         }
+    }
+
+    void UpdateCameraProjection(std::uint32_t width, std::uint32_t height) override
+    {
+        if (width == 0 || height == 0) return;
+        m_EditorCamera.SetViewportSize(width, height);
     }
 
     void HandleViewportResize(std::uint32_t width, std::uint32_t height) override
@@ -264,10 +272,6 @@ public:
     {
         std::string entityName = (name && name[0] != '\0') ? name : "Entity";
         auto entity = m_Scene.CreateEntityWithUUID(0, entityName, parentUuid);
-        auto& sprite = m_Scene.AddComponent<Obscura::Sprite2D>(entity);
-        sprite.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        sprite.useTexture = false;
-
         return m_Scene.GetComponent<Obscura::IDComponent>(entity).uuid;
     }
 
@@ -310,7 +314,7 @@ public:
         return true;
     }
 
-    bool SetEntitySprite2D(std::uint64_t uuid, const float color[4], std::uint32_t textureSlot, bool useTexture, const float uvOffset[2], const float uvScale[2], bool visible) override
+    bool SetEntitySprite2D(std::uint64_t uuid, const float color[4], const float uvOffset[2], const float uvScale[2], bool visible) override
     {
         auto entity = m_Scene.FindEntityByUUID(uuid);
         if (entity == entt::null) return false;
@@ -320,12 +324,157 @@ public:
         }
         auto& sprite = m_Scene.GetComponent<Obscura::Sprite2D>(entity);
         if (color) sprite.color = { color[0], color[1], color[2], color[3] };
-        sprite.textureSlot = textureSlot;
-        sprite.useTexture  = useTexture;
         if (uvOffset) sprite.uvOffset = { uvOffset[0], uvOffset[1] };
         if (uvScale)  sprite.uvScale  = { uvScale[0], uvScale[1] };
-        sprite.visible     = visible;
+        sprite.visible = visible;
         return true;
+    }
+
+    bool AddComponentToEntity(std::uint64_t uuid, const char* componentType) override
+    {
+        if (!componentType) return false;
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+
+        if (strcmp(componentType, "Sprite2D") == 0)
+        {
+            if (!m_Scene.HasComponent<Obscura::Sprite2D>(entity))
+            {
+                auto& s = m_Scene.AddComponent<Obscura::Sprite2D>(entity);
+                s.color = glm::vec4(1.0f);
+                s.visible = true;
+                return true;
+            }
+        }
+        else if (strcmp(componentType, "Transform") == 0)
+        {
+            if (!m_Scene.HasComponent<Obscura::Transform>(entity))
+            {
+                m_Scene.AddComponent<Obscura::Transform>(entity);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool RemoveComponentFromEntity(std::uint64_t uuid, const char* componentType) override
+    {
+        if (!componentType) return false;
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+
+        if (strcmp(componentType, "Sprite2D") == 0)
+        {
+            if (m_Scene.HasComponent<Obscura::Sprite2D>(entity))
+            {
+                m_Scene.RemoveComponent<Obscura::Sprite2D>(entity);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Obscura::AssetHandle LoadTexture(const char* filePath) override
+    {
+        if (!filePath || filePath[0] == '\0')
+        {
+            return Obscura::NullAssetHandle;
+        }
+
+        std::string pathStr = filePath;
+        Obscura::AssetHandle handle = std::hash<std::string>{}(pathStr);
+
+        auto existing = Obscura::AssetManager::Get().GetTextureByHandle(handle);
+        if (existing && existing->GetState() == Obscura::AssetState::Ready && existing->IsGpuUploaded())
+        {
+            return handle;
+        }
+
+        if (m_RHI)
+        {
+            auto devObjects = m_RHI->GetVulkanDeviceObjects();
+            auto device = static_cast<VkDevice>(devObjects.device);
+            auto physicalDevice = static_cast<VkPhysicalDevice>(devObjects.physicalDevice);
+            auto queue = static_cast<VkQueue>(devObjects.graphicsQueue);
+
+            if (device != VK_NULL_HANDLE)
+            {
+                VkCommandPool commandPool = VK_NULL_HANDLE;
+                VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+                poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+                poolInfo.queueFamilyIndex = devObjects.queueFamilyIndex;
+                vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool);
+
+                auto tex = std::make_unique<Obscura::VulkanTexture>();
+                if (tex->LoadFromFile(device, physicalDevice, commandPool, queue, pathStr))
+                {
+                    uint32_t slot = Obscura::VulkanBindlessSystem::RegisterTexture(*tex);
+                    auto textureAsset = std::make_shared<Obscura::TextureAsset>(handle, pathStr);
+                    textureAsset->SetGpuSlot(slot);
+                    textureAsset->SetState(Obscura::AssetState::Ready);
+                    Obscura::AssetManager::Get().RegisterAsset(textureAsset);
+                    m_GpuTextures[handle] = std::move(tex);
+
+                    LOG_INFO("[Engine.dll] Loaded texture '{}' -> Handle: 0x{:016X}, Bindless Slot: {}", pathStr, handle, slot);
+                }
+                else
+                {
+                    LOG_ERROR("[Engine.dll] Failed to load texture from '{}'", pathStr);
+                    auto textureAsset = std::make_shared<Obscura::TextureAsset>(handle, pathStr);
+                    textureAsset->SetState(Obscura::AssetState::Failed);
+                    Obscura::AssetManager::Get().RegisterAsset(textureAsset);
+                }
+
+                vkDestroyCommandPool(device, commandPool, nullptr);
+            }
+        }
+
+        return handle;
+    }
+
+    bool SetEntityTexture(std::uint64_t uuid, const char* filePath) override
+    {
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return false;
+
+        if (!m_Scene.HasComponent<Obscura::Sprite2D>(entity))
+        {
+            m_Scene.AddComponent<Obscura::Sprite2D>(entity);
+        }
+
+        auto& sprite = m_Scene.GetComponent<Obscura::Sprite2D>(entity);
+        if (!filePath || filePath[0] == '\0')
+        {
+            sprite.textureHandle = Obscura::NullAssetHandle;
+            sprite.texturePath.clear();
+            return true;
+        }
+
+        sprite.texturePath = filePath;
+        sprite.textureHandle = LoadTexture(filePath);
+        return true;
+    }
+
+    std::uint32_t GetEntityTextureState(std::uint64_t uuid) const override
+    {
+        auto entity = m_Scene.FindEntityByUUID(uuid);
+        if (entity == entt::null) return 0;
+
+        if (m_Scene.HasComponent<Obscura::Sprite2D>(entity))
+        {
+            const auto& s = m_Scene.GetComponent<Obscura::Sprite2D>(entity);
+            if (s.textureHandle == Obscura::NullAssetHandle)
+            {
+                return 0; // Unloaded / None
+            }
+            auto asset = Obscura::AssetManager::Get().GetTextureByHandle(s.textureHandle);
+            if (asset)
+            {
+                return static_cast<std::uint32_t>(asset->GetState());
+            }
+            return 3; // Failed
+        }
+        return 0;
     }
 
 private:
@@ -361,8 +510,21 @@ private:
             outDesc->spriteColor[1] = s.color.g;
             outDesc->spriteColor[2] = s.color.b;
             outDesc->spriteColor[3] = s.color.a;
-            outDesc->textureSlot = s.textureSlot;
-            outDesc->useTexture  = s.useTexture;
+            outDesc->textureHandle = s.textureHandle;
+            strncpy_s(outDesc->texturePath, sizeof(outDesc->texturePath), s.texturePath.c_str(), _TRUNCATE);
+            outDesc->textureState = 0;
+            if (s.textureHandle != Obscura::NullAssetHandle)
+            {
+                auto asset = Obscura::AssetManager::Get().GetTextureByHandle(s.textureHandle);
+                if (asset)
+                {
+                    outDesc->textureState = static_cast<std::uint32_t>(asset->GetState());
+                }
+                else
+                {
+                    outDesc->textureState = static_cast<std::uint32_t>(Obscura::AssetState::Failed);
+                }
+            }
             outDesc->uvOffset[0] = s.uvOffset.x;
             outDesc->uvOffset[1] = s.uvOffset.y;
             outDesc->uvScale[0]  = s.uvScale.x;
@@ -381,6 +543,7 @@ private:
     Obscura::Scene                         m_Scene;
     Obscura::Scope<Obscura::SceneRenderer> m_SceneRenderer;
     Obscura::EditorCamera                  m_EditorCamera;
+    std::unordered_map<Obscura::AssetHandle, std::unique_ptr<Obscura::VulkanTexture>> m_GpuTextures;
 
     float                                  m_LastMouseX     = 0.0f;
     float                                  m_LastMouseY     = 0.0f;

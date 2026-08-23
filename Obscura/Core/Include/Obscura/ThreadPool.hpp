@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Obscura/API.hpp>
 #include <cppcoro/coroutine.hpp>
 #include <cppcoro/task.hpp>
 
@@ -19,7 +20,7 @@ namespace Obscura
 {
     class ThreadPool;
 
-    struct ScheduleAwaiter
+    struct OBSCURA_CORE_API ScheduleAwaiter
     {
         ThreadPool* m_Pool = nullptr;
 
@@ -30,7 +31,7 @@ namespace Obscura
         void await_resume() const noexcept {}
     };
 
-    class ThreadPool
+    class OBSCURA_CORE_API ThreadPool
     {
     public:
         explicit ThreadPool(

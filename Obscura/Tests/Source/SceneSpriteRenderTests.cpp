@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <Scene/Scene.hpp>
+#include <Assets/Asset.hpp>
+#include <Assets/AssetManager.hpp>
 #include <Renderer/SceneRenderer.hpp>
 #include <Vulkan/VulkanBindlessSystem.hpp>
 #include <Vulkan/VulkanRHI.hpp>
@@ -61,8 +63,7 @@ TEST_F(SceneSpriteRenderTest, SceneRenderer_InitializeAndOffscreenSpritePass)
     greenTransform.scale    = glm::vec3(0.4f, 0.4f, 1.0f);
 
     auto& greenSprite = scene.AddComponent<Obscura::Sprite2D>(greenEntity);
-    greenSprite.color      = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-    greenSprite.useTexture = false;
+    greenSprite.color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
 
     // Entity 2: Textured blue sprite quad
     const uint32_t bluePixel = 0xFFFF0000; // RGBA Blue
@@ -77,15 +78,19 @@ TEST_F(SceneSpriteRenderTest, SceneRenderer_InitializeAndOffscreenSpritePass)
     uint32_t blueSlot = Obscura::VulkanBindlessSystem::RegisterTexture(blueTex);
     EXPECT_NE(blueSlot, Obscura::INVALID_BINDLESS_INDEX);
 
+    auto textureAsset = std::make_shared<Obscura::TextureAsset>(0x1234, "mock/blue");
+    textureAsset->SetGpuSlot(blueSlot);
+    textureAsset->SetState(Obscura::AssetState::Ready);
+    Obscura::AssetManager::Get().RegisterAsset(textureAsset);
+
     auto blueEntity = scene.CreateEntity("BlueSprite");
     auto& blueTransform = scene.GetComponent<Obscura::Transform>(blueEntity);
     blueTransform.position = glm::vec3(0.3f, 0.0f, 0.0f);
     blueTransform.scale    = glm::vec3(0.4f, 0.4f, 1.0f);
 
     auto& blueSprite = scene.AddComponent<Obscura::Sprite2D>(blueEntity);
-    blueSprite.color       = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    blueSprite.textureSlot = blueSlot;
-    blueSprite.useTexture  = true;
+    blueSprite.color         = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    blueSprite.textureHandle = 0x1234;
 
     // Render offscreen frame
     for (int frame = 0; frame < 3; ++frame)
@@ -107,7 +112,7 @@ TEST_F(SceneSpriteRenderTest, SceneRenderer_InitializeAndOffscreenSpritePass)
     blueTex.Destroy();
 }
 
-TEST_F(SceneSpriteRenderTest, Batch2D_CapacityGrowthAndMultiQuadRendering)
+TEST_F(SceneSpriteRenderTest, Batch2DDynamicResizeWithLargeScene)
 {
     m_SceneRenderer = std::make_unique<Obscura::SceneRenderer>();
     ASSERT_TRUE(m_SceneRenderer->Initialize(m_RHI.get()));
@@ -129,7 +134,6 @@ TEST_F(SceneSpriteRenderTest, Batch2D_CapacityGrowthAndMultiQuadRendering)
 
         auto& sprite = scene.AddComponent<Obscura::Sprite2D>(entity);
         sprite.color = glm::vec4(static_cast<float>(i % 10) / 10.0f, 0.5f, 1.0f, 1.0f);
-        sprite.useTexture = false;
     }
 
     // Render multiple frames to verify no crashes, smooth buffer reuse, and capacity growth

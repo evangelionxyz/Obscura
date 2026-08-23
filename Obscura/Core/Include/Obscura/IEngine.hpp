@@ -19,6 +19,7 @@ namespace Obscura
         virtual void        Destroy()    = 0;
 
         // Viewport & Input controls
+        virtual void UpdateCameraProjection(std::uint32_t width, std::uint32_t height) = 0;
         virtual void HandleViewportResize(std::uint32_t width, std::uint32_t height) = 0;
         virtual void HandleMouseMove(float x, float y, bool rightMouseDown, bool middleMouseDown, bool leftMouseDown) = 0;
         virtual void HandleMouseButton(int button, bool pressed, float x, float y) = 0;
@@ -32,7 +33,12 @@ namespace Obscura
         virtual bool          DestroyEntity(std::uint64_t uuid) = 0;
         virtual bool          SetEntityName(std::uint64_t uuid, const char* name) = 0;
         virtual bool          SetEntityTransform(std::uint64_t uuid, const float position[3], const float rotation[3], const float scale[3]) = 0;
-        virtual bool          SetEntitySprite2D(std::uint64_t uuid, const float color[4], std::uint32_t textureSlot, bool useTexture, const float uvOffset[2], const float uvScale[2], bool visible) = 0;
+        virtual bool          SetEntitySprite2D(std::uint64_t uuid, const float color[4], const float uvOffset[2], const float uvScale[2], bool visible) = 0;
+        virtual bool          AddComponentToEntity(std::uint64_t uuid, const char* componentType) = 0;
+        virtual bool          RemoveComponentFromEntity(std::uint64_t uuid, const char* componentType) = 0;
+        virtual bool          SetEntityTexture(std::uint64_t uuid, const char* filePath) = 0;
+        virtual AssetHandle   LoadTexture(const char* filePath) = 0;
+        virtual std::uint32_t GetEntityTextureState(std::uint64_t uuid) const = 0;
     };
 
 

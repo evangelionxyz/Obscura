@@ -24,6 +24,16 @@ namespace ObscuraEditor
         setAcceptHoverEvents(true);
         setFlag(ItemAcceptsInputMethod, true);
 
+        m_ResizeDebounceTimer.setSingleShot(true);
+        m_ResizeDebounceTimer.setInterval(120);
+        connect(&m_ResizeDebounceTimer, &QTimer::timeout, this, [this]() {
+            if (s_Application && m_PendingWidth > 0 && m_PendingHeight > 0)
+            {
+                m_PendingResize = true;
+                update();
+            }
+        });
+
         if (s_Application)
         {
             connect(s_Application, &EditorApplication::frameRendered, this, &EngineViewport::onFrameReady, Qt::QueuedConnection);
@@ -236,9 +246,17 @@ namespace ObscuraEditor
 
             m_PendingWidth  = static_cast<std::uint32_t>(std::round(newGeometry.width()));
             m_PendingHeight = static_cast<std::uint32_t>(std::round(newGeometry.height()));
-            m_PendingResize = true;
 
-            update(); // Request SceneGraph update
+            // 1. Immediately update Camera Aspect Ratio so projection is always responsive and distortion-free
+            if (s_Application)
+            {
+                s_Application->onViewportAspectResized(m_PendingWidth, m_PendingHeight);
+            }
+
+            // 2. Debounce heavy GPU image & framebuffer recreation until resize interaction finishes
+            m_ResizeDebounceTimer.start(120);
+
+            update(); // Request SceneGraph update to stretch current frame
         }
     }
 

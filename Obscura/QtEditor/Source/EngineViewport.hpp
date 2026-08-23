@@ -4,6 +4,7 @@
 #include <QtQuick/QSGSimpleTextureNode>
 #include <QtGui/QImage>
 #include <QtQml/qqmlregistration.h>
+#include <QtCore/QTimer>
 #include <Obscura/IRHI.hpp>
 
 #include <vector>
@@ -56,6 +57,7 @@ namespace ObscuraEditor
         QImage                           m_LatestImage;
         std::vector<TextureCacheEntry>   m_TextureCache;
 
+        QTimer                           m_ResizeDebounceTimer;
         bool                             m_PendingResize = false;
         std::uint32_t                    m_PendingWidth = 0;
         std::uint32_t                    m_PendingHeight = 0;

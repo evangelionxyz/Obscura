@@ -14,6 +14,28 @@ Rectangle {
     property string selectedEntityUuid: ""
     property var selectedEntity: null
 
+    onSelectedEntityUuidChanged: {
+        root.updateFromEntity(root.selectedEntityUuid);
+    }
+
+    onSelectedEntityChanged: {
+        root.syncComponents(root.selectedEntity);
+    }
+
+    function syncComponents(ent) {
+        if (!ent || !ent.uuid) {
+            idComp.loadFromEntity(null);
+            transformComp.loadFromEntity(null);
+            spriteComp.loadFromEntity(null);
+            return;
+        }
+        idComp.loadFromEntity(ent);
+        transformComp.loadFromEntity(ent);
+        if (ent.hasSprite2D) {
+            spriteComp.loadFromEntity(ent);
+        }
+    }
+
     function updateFromEntity(uuid) {
         root.selectedEntityUuid = uuid;
         if (uuid && uuid.length > 0) {
@@ -22,6 +44,7 @@ Rectangle {
         } else {
             root.selectedEntity = null;
         }
+        root.syncComponents(root.selectedEntity);
     }
 
     Connections {
@@ -30,6 +53,7 @@ Rectangle {
             if (uuid === root.selectedEntityUuid) {
                 var ent = EditorApp.getEntity(uuid);
                 root.selectedEntity = (ent && ent.uuid) ? ent : null;
+                root.syncComponents(root.selectedEntity);
             }
         }
         function onSceneEntitiesChanged() {
@@ -37,12 +61,15 @@ Rectangle {
                 var ent = EditorApp.getEntity(root.selectedEntityUuid);
                 if (ent && ent.uuid) {
                     root.selectedEntity = ent;
+                    root.syncComponents(ent);
                 } else {
                     root.selectedEntityUuid = "";
                     root.selectedEntity = null;
+                    root.syncComponents(null);
                 }
             } else {
                 root.selectedEntity = null;
+                root.syncComponents(null);
             }
         }
     }
@@ -113,9 +140,6 @@ Rectangle {
                     // ID / Identity Component
                     IDComponent {
                         id: idComp
-                        uuid: (root.selectedEntity && root.selectedEntity.uuid) ? root.selectedEntity.uuid : ""
-                        entityName: (root.selectedEntity && root.selectedEntity.name) ? root.selectedEntity.name : ""
-                        parentUuid: (root.selectedEntity && root.selectedEntity.parentUuid) ? root.selectedEntity.parentUuid : ""
                         onNameChanged: (newName) => {
                             EditorApp.setEntityName(root.selectedEntityUuid, newName);
                         }
@@ -130,16 +154,6 @@ Rectangle {
                     // Transform Component
                     TransformComponent {
                         id: transformComp
-                        posX: (root.selectedEntity && root.selectedEntity.posX !== undefined) ? root.selectedEntity.posX : 0.0
-                        posY: (root.selectedEntity && root.selectedEntity.posY !== undefined) ? root.selectedEntity.posY : 0.0
-                        posZ: (root.selectedEntity && root.selectedEntity.posZ !== undefined) ? root.selectedEntity.posZ : 0.0
-                        rotX: (root.selectedEntity && root.selectedEntity.rotX !== undefined) ? root.selectedEntity.rotX : 0.0
-                        rotY: (root.selectedEntity && root.selectedEntity.rotY !== undefined) ? root.selectedEntity.rotY : 0.0
-                        rotZ: (root.selectedEntity && root.selectedEntity.rotZ !== undefined) ? root.selectedEntity.rotZ : 0.0
-                        scaleX: (root.selectedEntity && root.selectedEntity.scaleX !== undefined) ? root.selectedEntity.scaleX : 1.0
-                        scaleY: (root.selectedEntity && root.selectedEntity.scaleY !== undefined) ? root.selectedEntity.scaleY : 1.0
-                        scaleZ: (root.selectedEntity && root.selectedEntity.scaleZ !== undefined) ? root.selectedEntity.scaleZ : 1.0
-
                         onTransformChanged: {
                             if (root.selectedEntityUuid) {
                                 EditorApp.setEntityTransform(
@@ -152,38 +166,84 @@ Rectangle {
                         }
                     }
 
+                    // Sprite 2D Component
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: root.selectedEntity && root.selectedEntity.hasSprite2D
+                        spacing: 8
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 1
+                            color: "#2d3340"
+                        }
+
+                        Sprite2DComponent {
+                            id: spriteComp
+                            onSpriteChanged: {
+                                if (root.selectedEntityUuid) {
+                                    EditorApp.setEntitySprite2D(
+                                        root.selectedEntityUuid,
+                                        colorR, colorG, colorB, colorA,
+                                        uvOffsetX, uvOffsetY,
+                                        uvScaleX, uvScaleY,
+                                        spriteVisible
+                                    );
+                                }
+                            }
+                            onTextureSelected: (filePath) => {
+                                if (root.selectedEntityUuid) {
+                                    EditorApp.setEntityTexture(root.selectedEntityUuid, filePath);
+                                }
+                            }
+                            onRemoveRequested: {
+                                if (root.selectedEntityUuid) {
+                                    EditorApp.removeEntityComponent(root.selectedEntityUuid, "Sprite2D");
+                                }
+                            }
+                        }
+                    }
+
                     Rectangle {
                         Layout.fillWidth: true
                         height: 1
                         color: "#2d3340"
                     }
 
-                    // Sprite 2D Component
-                    Sprite2DComponent {
-                        id: spriteComp
-                        visible: root.selectedEntity && root.selectedEntity.hasSprite2D
-                        colorR: (root.selectedEntity && root.selectedEntity.colorR !== undefined) ? root.selectedEntity.colorR : 1.0
-                        colorG: (root.selectedEntity && root.selectedEntity.colorG !== undefined) ? root.selectedEntity.colorG : 1.0
-                        colorB: (root.selectedEntity && root.selectedEntity.colorB !== undefined) ? root.selectedEntity.colorB : 1.0
-                        colorA: (root.selectedEntity && root.selectedEntity.colorA !== undefined) ? root.selectedEntity.colorA : 1.0
-                        textureSlot: (root.selectedEntity && root.selectedEntity.textureSlot !== undefined) ? root.selectedEntity.textureSlot : 0
-                        useTexture: (root.selectedEntity && root.selectedEntity.useTexture !== undefined) ? root.selectedEntity.useTexture : false
-                        uvOffsetX: (root.selectedEntity && root.selectedEntity.uvOffsetX !== undefined) ? root.selectedEntity.uvOffsetX : 0.0
-                        uvOffsetY: (root.selectedEntity && root.selectedEntity.uvOffsetY !== undefined) ? root.selectedEntity.uvOffsetY : 0.0
-                        uvScaleX: (root.selectedEntity && root.selectedEntity.uvScaleX !== undefined) ? root.selectedEntity.uvScaleX : 1.0
-                        uvScaleY: (root.selectedEntity && root.selectedEntity.uvScaleY !== undefined) ? root.selectedEntity.uvScaleY : 1.0
-                        spriteVisible: (root.selectedEntity && root.selectedEntity.spriteVisible !== undefined) ? root.selectedEntity.spriteVisible : true
+                    // Add Component Button & Dropdown
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 12
+                        Layout.rightMargin: 12
+                        Layout.topMargin: 4
+                        Layout.bottomMargin: 4
 
-                        onSpriteChanged: {
-                            if (root.selectedEntityUuid) {
-                                EditorApp.setEntitySprite2D(
-                                    root.selectedEntityUuid,
-                                    colorR, colorG, colorB, colorA,
-                                    textureSlot, useTexture,
-                                    uvOffsetX, uvOffsetY,
-                                    uvScaleX, uvScaleY,
-                                    spriteVisible
-                                );
+                        Button {
+                            id: addComponentBtn
+                            text: "+ Add Component"
+                            Layout.fillWidth: true
+                            implicitHeight: 28
+                            font.pixelSize: 11
+                            font.bold: true
+                            Material.background: "#20242e"
+                            Material.foreground: "#6c8dfa"
+                            onClicked: addComponentMenu.open()
+
+                            Menu {
+                                id: addComponentMenu
+                                y: addComponentBtn.height + 2
+                                width: addComponentBtn.width
+
+                                MenuItem {
+                                    text: "Sprite 2D"
+                                    enabled: root.selectedEntity && !root.selectedEntity.hasSprite2D
+                                    font.pixelSize: 11
+                                    onTriggered: {
+                                        if (root.selectedEntityUuid) {
+                                            EditorApp.addEntityComponent(root.selectedEntityUuid, "Sprite2D");
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

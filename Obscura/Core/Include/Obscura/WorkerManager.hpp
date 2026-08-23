@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Obscura/API.hpp>
 #include <Obscura/ThreadPool.hpp>
 
 #include <memory>
@@ -15,7 +16,7 @@ namespace Obscura
         IO
     };
 
-    class WorkerManager
+    class OBSCURA_CORE_API WorkerManager
     {
     public:
         static WorkerManager& Get();

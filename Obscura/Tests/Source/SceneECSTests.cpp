@@ -23,15 +23,15 @@ TEST(SceneECSTest, EntityLifecycleAndComponents)
     // Add Sprite2D
     auto& sprite = scene.AddComponent<Obscura::Sprite2D>(e1);
     sprite.color = glm::vec4(1.0f, 0.5f, 0.2f, 1.0f);
-    sprite.textureSlot = 42;
-    sprite.useTexture = true;
+    sprite.textureHandle = 0xABCD1234;
+    sprite.texturePath = "test/path.png";
 
     EXPECT_TRUE(scene.HasComponent<Obscura::Sprite2D>(e1));
     EXPECT_FALSE(scene.HasComponent<Obscura::Sprite2D>(e2));
 
     const auto& s = scene.GetComponent<Obscura::Sprite2D>(e1);
-    EXPECT_EQ(s.textureSlot, 42u);
-    EXPECT_TRUE(s.useTexture);
+    EXPECT_EQ(s.textureHandle, 0xABCD1234u);
+    EXPECT_EQ(s.texturePath, "test/path.png");
     EXPECT_FLOAT_EQ(s.color.r, 1.0f);
     EXPECT_FLOAT_EQ(s.color.g, 0.5f);
 
@@ -101,7 +101,7 @@ TEST(SceneECSTest, EnTTRuntimeViewIteration)
         if (i % 2 == 0)
         {
             auto& s = scene.AddComponent<Obscura::Sprite2D>(entity);
-            s.textureSlot = i;
+            s.textureHandle = static_cast<Obscura::AssetHandle>(i);
         }
     }
 
@@ -110,7 +110,7 @@ TEST(SceneECSTest, EnTTRuntimeViewIteration)
     for (auto entity : view)
     {
         const auto& [t, s] = view.get<Obscura::Transform, Obscura::Sprite2D>(entity);
-        EXPECT_EQ(s.textureSlot % 2, 0u);
+        EXPECT_EQ(s.textureHandle % 2, 0u);
         count++;
     }
     EXPECT_EQ(count, 5u);

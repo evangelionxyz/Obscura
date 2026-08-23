@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Obscura/API.hpp>
 #include <filesystem>
 #include <string>
 
@@ -21,7 +22,7 @@
 namespace Obscura
 {
 
-    class Module
+    class OBSCURA_CORE_API Module
     {
     public:
         Module() = default;

@@ -287,6 +287,14 @@ namespace Obscura
             return;
         }
 
+        uint32_t actualW = rhi->GetFrameBufferWidth();
+        uint32_t actualH = rhi->GetFrameBufferHeight();
+        if (actualW == 0 || actualH == 0)
+        {
+            actualW = width;
+            actualH = height;
+        }
+
         std::array<VkImageView, PIPELINE_BACKBUFFER_COUNT> imageViews{};
         for (uint32_t i = 0; i < PIPELINE_BACKBUFFER_COUNT; ++i)
         {
@@ -297,7 +305,7 @@ namespace Obscura
         {
             for (auto &pipeline : m_Pipelines | std::views::values)
             {
-                pipeline->RecreateFramebuffers(imageViews, width, height);
+                pipeline->RecreateFramebuffers(imageViews, actualW, actualH);
             }
             m_LastImageViews = imageViews;
         }

@@ -6,9 +6,13 @@
 namespace Obscura
 {
     // ABI version constants — bump these when interface layouts change
-    constexpr std::uint32_t ENGINE_ABI_VERSION = 1;
+    constexpr std::uint32_t ENGINE_ABI_VERSION = 2;
     constexpr std::uint32_t RHI_ABI_VERSION    = 2;
     constexpr std::uint32_t PLUGIN_ABI_VERSION = 1;
+
+    // Universal Asset Handle (64-bit non-zero hash)
+    using AssetHandle = std::uint64_t;
+    inline constexpr AssetHandle NullAssetHandle = 0;
 
     enum class RenderMode : std::uint8_t
     {
@@ -45,8 +49,9 @@ namespace Obscura
         float         scale[3]     = { 1.0f, 1.0f, 1.0f };
         bool          hasSprite2D  = false;
         float         spriteColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        std::uint32_t textureSlot  = 0;
-        bool          useTexture   = false;
+        AssetHandle   textureHandle  = NullAssetHandle;
+        char          texturePath[260] = { 0 };
+        std::uint32_t textureState   = 0; // 0=Unloaded, 1=Loading, 2=Ready, 3=Failed
         float         uvOffset[2]  = { 0.0f, 0.0f };
         float         uvScale[2]   = { 1.0f, 1.0f };
         bool          spriteVisible = true;

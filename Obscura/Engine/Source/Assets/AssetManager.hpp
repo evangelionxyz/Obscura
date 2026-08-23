@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Obscura/API.hpp>
+#include <Obscura/Types.hpp>
 #include "Asset.hpp"
 #include "AssetWorker.hpp"
 
@@ -36,10 +37,12 @@ namespace Obscura
 
         [[nodiscard]] std::shared_ptr<TextureAsset> GetTexture(const std::string& path) const;
         [[nodiscard]] std::shared_ptr<TextureAsset> GetTextureByUUID(std::uint64_t uuid) const;
+        [[nodiscard]] std::shared_ptr<TextureAsset> GetTextureByHandle(AssetHandle handle) const { return GetTextureByUUID(handle); }
         [[nodiscard]] std::shared_ptr<Asset> GetAssetByUUID(std::uint64_t uuid) const;
+        [[nodiscard]] std::shared_ptr<Asset> GetAssetByHandle(AssetHandle handle) const { return GetAssetByUUID(handle); }
 
         void RegisterAsset(std::shared_ptr<Asset> asset);
-        void UnregisterAsset(std::uint64_t uuid);
+        void UnregisterAsset(AssetHandle handle);
         void Clear();
 
         [[nodiscard]] std::size_t GetAssetCount() const;

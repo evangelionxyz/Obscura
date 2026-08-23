@@ -1,5 +1,6 @@
 #include "EditorApplication.hpp"
 #include "EngineViewport.hpp"
+#include <Obscura/Logger.hpp>
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDir>
@@ -16,11 +17,21 @@ namespace ObscuraEditor
     {
         EngineViewport::SetApplicationInstance(this);
 
+        Obscura::Logger::Init();
+        Obscura::Logger::SetCallback([this](spdlog::level::level_enum level, const std::string &msg) {
+            QString qMsg = QString::fromStdString(msg);
+            int lvl = static_cast<int>(level);
+            QMetaObject::invokeMethod(this, [this, lvl, qMsg]() {
+                emit logMessage(qMsg, lvl);
+            }, Qt::QueuedConnection);
+        });
+
         connect(&m_TickTimer, &QTimer::timeout, this, &EditorApplication::onTick);
     }
 
     EditorApplication::~EditorApplication()
     {
+        Obscura::Logger::ClearCallback();
         shutdown();
     }
 
@@ -178,6 +189,23 @@ namespace ObscuraEditor
         QCoreApplication::quit();
     }
 
+    void EditorApplication::onViewportAspectResized(std::uint32_t width, std::uint32_t height)
+    {
+        if (width == 0 || height == 0)
+        {
+            return;
+        }
+
+        m_ViewportWidth  = width;
+        m_ViewportHeight = height;
+
+        if (m_Engine)
+        {
+            m_Engine->UpdateCameraProjection(width, height);
+            onTick();
+        }
+    }
+
     void EditorApplication::onViewportResized(std::uint32_t width, std::uint32_t height)
     {
         if (width == 0 || height == 0)
@@ -190,14 +218,16 @@ namespace ObscuraEditor
 
         if (m_Engine)
         {
-            m_Engine->HandleViewportResize(width, height);
+            // 1. Resize RHI Offscreen Target first (creates new VkImages & VkImageViews with new width, height)
             if (auto* rhi = m_Engine->GetRHI())
             {
-                if (rhi->ResizeOffscreenTarget(width, height))
-                {
-                    onTick();
-                }
+                rhi->ResizeOffscreenTarget(width, height);
             }
+
+            // 2. Recreate framebuffers matching the new VkImageViews and update camera
+            m_Engine->HandleViewportResize(width, height);
+
+            onTick();
         }
     }
 
@@ -382,8 +412,9 @@ namespace ObscuraEditor
         map["colorG"]        = desc.spriteColor[1];
         map["colorB"]        = desc.spriteColor[2];
         map["colorA"]        = desc.spriteColor[3];
-        map["textureSlot"]   = static_cast<int>(desc.textureSlot);
-        map["useTexture"]    = desc.useTexture;
+        map["textureHandle"] = formatUUID(desc.textureHandle);
+        map["texturePath"]   = QString::fromUtf8(desc.texturePath);
+        map["textureState"]  = static_cast<int>(desc.textureState);
         map["uvOffsetX"]     = desc.uvOffset[0];
         map["uvOffsetY"]     = desc.uvOffset[1];
         map["uvScaleX"]      = desc.uvScale[0];
@@ -460,7 +491,7 @@ namespace ObscuraEditor
         return success;
     }
 
-    bool EditorApplication::setEntitySprite2D(const QString &uuidHex, double cr, double cg, double cb, double ca, int textureSlot, bool useTexture, double uvOx, double uvOy, double uvSx, double uvSy, bool visible)
+    bool EditorApplication::setEntitySprite2D(const QString &uuidHex, double cr, double cg, double cb, double ca, double uvOx, double uvOy, double uvSx, double uvSy, bool visible)
     {
         if (!m_Engine)
         {
@@ -472,7 +503,57 @@ namespace ObscuraEditor
         float uvOffset[2] = { static_cast<float>(uvOx), static_cast<float>(uvOy) };
         float uvScale[2]  = { static_cast<float>(uvSx), static_cast<float>(uvSy) };
 
-        bool success = m_Engine->SetEntitySprite2D(uuid, color, static_cast<std::uint32_t>(textureSlot), useTexture, uvOffset, uvScale, visible);
+        bool success = m_Engine->SetEntitySprite2D(uuid, color, uvOffset, uvScale, visible);
+        if (success)
+        {
+            emit entityUpdated(uuidHex);
+        }
+        return success;
+    }
+
+    bool EditorApplication::addEntityComponent(const QString &uuidHex, const QString &componentType)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        bool success = m_Engine->AddComponentToEntity(uuid, componentType.toUtf8().constData());
+        if (success)
+        {
+            emit sceneEntitiesChanged();
+            emit entityUpdated(uuidHex);
+        }
+        return success;
+    }
+
+    bool EditorApplication::removeEntityComponent(const QString &uuidHex, const QString &componentType)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        bool success = m_Engine->RemoveComponentFromEntity(uuid, componentType.toUtf8().constData());
+        if (success)
+        {
+            emit sceneEntitiesChanged();
+            emit entityUpdated(uuidHex);
+        }
+        return success;
+    }
+
+    bool EditorApplication::setEntityTexture(const QString &uuidHex, const QString &filePath)
+    {
+        if (!m_Engine)
+        {
+            return false;
+        }
+
+        std::uint64_t uuid = parseUUID(uuidHex);
+        bool success = m_Engine->SetEntityTexture(uuid, filePath.toUtf8().constData());
         if (success)
         {
             emit entityUpdated(uuidHex);
@@ -523,5 +604,10 @@ namespace ObscuraEditor
             return list.at(slot);
         }
         return QString();
+    }
+
+    void EditorApplication::clearLogs()
+    {
+        Obscura::Logger::ClearLogs();
     }
 }

@@ -17,6 +17,25 @@ RowLayout {
 
     signal valuesChanged(real x, real y, real z)
 
+    function setValues(x, y, z) {
+        root.valueX = x;
+        root.valueY = y;
+        root.valueZ = z;
+        xChannel.setValue(x);
+        yChannel.setValue(y);
+        zChannel.setValue(z);
+    }
+
+    onValueXChanged: {
+        xChannel.setValue(root.valueX);
+    }
+    onValueYChanged: {
+        yChannel.setValue(root.valueY);
+    }
+    onValueZChanged: {
+        zChannel.setValue(root.valueZ);
+    }
+
     Label {
         text: root.label
         Layout.preferredWidth: root.labelWidth
@@ -40,6 +59,23 @@ RowLayout {
         required property color channelColor
         property real value: 0.0
         signal valueModified(real newVal)
+
+        function setValue(val) {
+            channel.value = val;
+            if (!inputField.activeFocus && !dragArea.isDragging) {
+                inputField.text = Number(val).toFixed(2);
+            }
+        }
+
+        onValueChanged: {
+            if (!inputField.activeFocus && !dragArea.isDragging) {
+                inputField.text = Number(value).toFixed(2);
+            }
+        }
+
+        Component.onCompleted: {
+            inputField.text = Number(value).toFixed(2);
+        }
 
         HoverHandler {
             id: hoverArea
@@ -96,6 +132,8 @@ RowLayout {
                         var delta = globalPos.x - startX;
                         var step = (mouse.modifiers & Qt.ShiftModifier) ? 0.01 : ((mouse.modifiers & Qt.ControlModifier) ? 1.0 : root.dragSpeed);
                         var newVal = Math.round((startVal + delta * step) * 100) / 100;
+                        channel.value = newVal;
+                        inputField.text = Number(newVal).toFixed(2);
                         channel.valueModified(newVal);
                     }
                 }
@@ -142,44 +180,47 @@ RowLayout {
             onEditingFinished: {
                 var val = parseFloat(text);
                 if (!isNaN(val)) {
+                    channel.value = val;
                     channel.valueModified(val);
-                } else {
-                    text = Number(channel.value).toFixed(2);
                 }
+                text = Number(channel.value).toFixed(2);
             }
         }
     }
 
     // X Channel (Red)
     AxisChannel {
+        id: xChannel
         axisLabel: "X"
         channelColor: "#e53935"
         value: root.valueX
         onValueModified: (newVal) => {
             root.valueX = newVal;
-            root.valuesChanged(root.valueX, root.valueY, root.valueZ);
+            root.valuesChanged(newVal, root.valueY, root.valueZ);
         }
     }
 
     // Y Channel (Green)
     AxisChannel {
+        id: yChannel
         axisLabel: "Y"
         channelColor: "#43a047"
         value: root.valueY
         onValueModified: (newVal) => {
             root.valueY = newVal;
-            root.valuesChanged(root.valueX, root.valueY, root.valueZ);
+            root.valuesChanged(root.valueX, newVal, root.valueZ);
         }
     }
 
     // Z Channel (Blue)
     AxisChannel {
+        id: zChannel
         axisLabel: "Z"
         channelColor: "#1e88e5"
         value: root.valueZ
         onValueModified: (newVal) => {
             root.valueZ = newVal;
-            root.valuesChanged(root.valueX, root.valueY, root.valueZ);
+            root.valuesChanged(root.valueX, root.valueY, newVal);
         }
     }
 }

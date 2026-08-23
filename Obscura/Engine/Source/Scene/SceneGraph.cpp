@@ -6,6 +6,7 @@
 #include "Renderer/Batch2D.hpp"
 
 #include "Scene/Scene.hpp"
+#include "Assets/AssetManager.hpp"
 
 #if defined(_WIN32)
     #ifndef NOMINMAX
@@ -30,7 +31,7 @@ namespace Obscura
         // Batch 2D Pass
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetPipeline());
 
-        // 2Bind global bindless descriptor set (Set 0) if available
+        // Bind global bindless descriptor set (Set 0) if available
         if (VulkanBindlessSystem::IsInitialized() && VulkanBindlessSystem::GetDescriptorSet() != VK_NULL_HANDLE)
         {
             VkDescriptorSet bindlessSet = VulkanBindlessSystem::GetDescriptorSet();
@@ -59,14 +60,26 @@ namespace Obscura
                     continue;
                 }
 
-                uint32_t useTex = sprite.useTexture ? 1u : 0u;
-                if (batch2D->GetQuadCount() > 0 && (batch2D->GetCurrentTextureSlot() != sprite.textureSlot || batch2D->GetCurrentUseTexture() != useTex))
+                uint32_t textureSlot = 0;
+                uint32_t useTex = 0u;
+
+                if (sprite.textureHandle != NullAssetHandle)
+                {
+                    auto textureAsset = AssetManager::Get().GetTextureByHandle(sprite.textureHandle);
+                    if (textureAsset && textureAsset->GetState() == AssetState::Ready && textureAsset->IsGpuUploaded())
+                    {
+                        textureSlot = textureAsset->GetGpuSlot();
+                        useTex = 1u;
+                    }
+                }
+
+                if (batch2D->GetQuadCount() > 0 && (batch2D->GetCurrentTextureSlot() != textureSlot || batch2D->GetCurrentUseTexture() != useTex))
                 {
                     batch2D->Flush(cmd, pipeline->GetLayout());
                     batch2D->BeginBatch(m_Scene->GetViewProj(), m_FrameIndex);
                 }
 
-                batch2D->DrawQuad(transform.GetTransformMatrix(), sprite.color, sprite.textureSlot, useTex, sprite.uvOffset, sprite.uvScale);
+                batch2D->DrawQuad(transform.GetTransformMatrix(), sprite.color, textureSlot, useTex != 0, sprite.uvOffset, sprite.uvScale);
             }
 
             if (batch2D->GetQuadCount() > 0)

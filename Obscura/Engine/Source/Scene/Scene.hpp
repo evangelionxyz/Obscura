@@ -65,12 +65,12 @@ namespace Obscura
     // Component: 2D Sprite
     struct Sprite2D
     {
-        glm::vec4 color       = glm::vec4(1.0f); // Tint RGBA
-        uint32_t  textureSlot = 0;               // Bindless slot index
-        bool      useTexture  = false;           // If true, sample bindless texture; else solid color
-        glm::vec2 uvOffset    = glm::vec2(0.0f, 0.0f);
-        glm::vec2 uvScale     = glm::vec2(1.0f, 1.0f);
-        bool      visible     = true;
+        glm::vec4   color         = glm::vec4(1.0f); // Tint RGBA
+        AssetHandle textureHandle = NullAssetHandle; // 0 = solid tint color, >0 = texture asset
+        std::string texturePath   = "";              // Local file path or asset path
+        glm::vec2   uvOffset      = glm::vec2(0.0f, 0.0f);
+        glm::vec2   uvScale       = glm::vec2(1.0f, 1.0f);
+        bool        visible       = true;
     };
 
     // EnTT-backed Scene managing entities and components.

@@ -131,7 +131,7 @@ Rectangle {
                     topPadding: 0
                     bottomPadding: 0
                     onClicked: {
-                        var newUuid = EditorApp.createEntity("Sprite_" + (entityModel.count + 1), "");
+                        var newUuid = EditorApp.createEntity("Entity_" + (entityModel.count + 1), "");
                         if (newUuid && newUuid.length > 0) {
                             root.selectEntity(newUuid);
                         }

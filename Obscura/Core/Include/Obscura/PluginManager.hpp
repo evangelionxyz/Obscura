@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Obscura/API.hpp"
 #include "Obscura/IPlugin.hpp"
 #include "Obscura/IEngine.hpp"
 #include "Obscura/Module.hpp"
@@ -12,7 +13,7 @@
 namespace Obscura
 {
 
-    class PluginManager
+    class OBSCURA_CORE_API PluginManager
     {
     public:
         PluginManager()  = default;

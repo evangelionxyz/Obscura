@@ -51,10 +51,15 @@ namespace ObscuraEditor
         Q_INVOKABLE bool         destroyEntity(const QString &uuidHex);
         Q_INVOKABLE bool         setEntityName(const QString &uuidHex, const QString &name);
         Q_INVOKABLE bool         setEntityTransform(const QString &uuidHex, double px, double py, double pz, double rx, double ry, double rz, double sx, double sy, double sz);
-        Q_INVOKABLE bool         setEntitySprite2D(const QString &uuidHex, double cr, double cg, double cb, double ca, int textureSlot, bool useTexture, double uvOx, double uvOy, double uvSx, double uvSy, bool visible);
+        Q_INVOKABLE bool         setEntitySprite2D(const QString &uuidHex, double cr, double cg, double cb, double ca, double uvOx, double uvOy, double uvSx, double uvSy, bool visible);
+        Q_INVOKABLE bool         addEntityComponent(const QString &uuidHex, const QString &componentType);
+        Q_INVOKABLE bool         removeEntityComponent(const QString &uuidHex, const QString &componentType);
+        Q_INVOKABLE bool         setEntityTexture(const QString &uuidHex, const QString &filePath);
         Q_INVOKABLE QStringList  getAvailableTextures();
         Q_INVOKABLE QString      getTexturePathForSlot(int slot);
+        Q_INVOKABLE void         clearLogs();
 
+        void onViewportAspectResized(std::uint32_t width, std::uint32_t height);
         void onViewportResized(std::uint32_t width, std::uint32_t height);
         void handleMouseMove(float x, float y);
         void handleMouseButton(int button, bool pressed, float x, float y);
@@ -77,7 +82,7 @@ namespace ObscuraEditor
         void engineInitialized(bool success);
         void statsUpdated();
         void vsyncChanged();
-        void logMessage(const QString &message);
+        void logMessage(const QString &message, int level = 2);
         void sceneEntitiesChanged();
         void entityUpdated(const QString &uuidHex);
 

@@ -9,6 +9,9 @@
 
 namespace Obscura
 {
+    static LogCallback s_LogCallback = nullptr;
+    static std::mutex  s_CallbackMutex;
+
     class ConsoleSink : public spdlog::sinks::base_sink<std::mutex>
     {
     public:
@@ -16,7 +19,23 @@ namespace Obscura
         {
             spdlog::memory_buf_t formatted;
             spdlog::sinks::base_sink<std::mutex>::formatter_->format(msg, formatted);
-            m_Messages.push_back({ msg.level, fmt::to_string(formatted) });
+            std::string formattedStr = fmt::to_string(formatted);
+            while (!formattedStr.empty() && (formattedStr.back() == '\n' || formattedStr.back() == '\r'))
+            {
+                formattedStr.pop_back();
+            }
+
+            m_Messages.push_back({ msg.level, formattedStr });
+
+            LogCallback cb;
+            {
+                std::lock_guard<std::mutex> lock(s_CallbackMutex);
+                cb = s_LogCallback;
+            }
+            if (cb)
+            {
+                cb(msg.level, formattedStr);
+            }
         }
 
         void flush_() override {}
@@ -70,12 +89,17 @@ namespace Obscura
 
     const std::vector<LogMessage> &Logger::GetLogs()
     {
-        return impl->consoleSink->m_Messages;
+        static const std::vector<LogMessage> s_EmptyLogs;
+        if (impl && impl->consoleSink)
+        {
+            return impl->consoleSink->m_Messages;
+        }
+        return s_EmptyLogs;
     }
 
     void Logger::ClearLogs()
     {
-        if (impl)
+        if (impl && impl->consoleSink)
         {
             impl->consoleSink->m_Messages.clear();
         }
@@ -83,14 +107,43 @@ namespace Obscura
 
     void Logger::PushLog(spdlog::level::level_enum level, const std::string &message)
     {
-        if (impl)
+        if (!impl)
+        {
+            Init();
+        }
+        if (impl && impl->consoleSink)
         {
             impl->consoleSink->m_Messages.push_back({ level, message });
+            LogCallback cb;
+            {
+                std::lock_guard<std::mutex> lock(s_CallbackMutex);
+                cb = s_LogCallback;
+            }
+            if (cb)
+            {
+                cb(level, message);
+            }
         }
+    }
+
+    void Logger::SetCallback(LogCallback callback)
+    {
+        std::lock_guard<std::mutex> lock(s_CallbackMutex);
+        s_LogCallback = std::move(callback);
+    }
+
+    void Logger::ClearCallback()
+    {
+        std::lock_guard<std::mutex> lock(s_CallbackMutex);
+        s_LogCallback = nullptr;
     }
 
     spdlog::logger *Logger::GetLogger()
     {
+        if (!impl)
+        {
+            Init();
+        }
         if (impl && impl->logger)
         {
             return impl->logger.get();
