@@ -30,9 +30,9 @@ insert_final_newline = true
 # Visual Studio C++ formatting hints (optional; ignored if unsupported)
 # Uncomment and tune these if you use Visual Studio's C++ formatter.
 # -----------------------------------------------------------------------------
-# [*.{cc,cpp,cxx,h,hh,hpp,hxx,ixx,cppm}]
-# cpp_indent_case_contents = true
-# cpp_indent_case_labels = true
+[*.{cc,cpp,cxx,h,hh,hpp,hxx,ixx,cppm}]
+cpp_indent_case_contents = true
+cpp_indent_case_labels = true
 # cpp_indent_braces = false
 # cpp_indent_preserve_within_parentheses = false
 # cpp_space_after_cast_close_parenthesis = true

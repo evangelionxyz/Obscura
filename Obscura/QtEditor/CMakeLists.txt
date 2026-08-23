@@ -1,11 +1,14 @@
 qt_add_executable(ObscuraQtEditor
-    Source/main.cpp
+    MANUAL_FINALIZATION
+    
     Source/EditorApplication.hpp
     Source/EditorApplication.cpp
     Source/EngineViewport.hpp
     Source/EngineViewport.cpp
+    Source/main.cpp
     Source/FrameBufferTransport.hpp
 )
+
 
 qt_add_qml_module(ObscuraQtEditor
     URI Obscura.Editor
@@ -41,6 +44,7 @@ target_link_libraries(ObscuraQtEditor PRIVATE
     Vulkan::Vulkan
 )
 
+
 # Deployment via windeployqt
 find_program(WINDEPLOYQT_EXECUTABLE NAMES windeployqt windeployqt6 PATHS "${Qt6_DIR}/../../../bin" "$ENV{QT_SDK}/bin")
 
@@ -51,11 +55,11 @@ if (WINDEPLOYQT_EXECUTABLE)
     )
 endif()
 
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
+qt_import_qml_plugins(ObscuraQtEditor)
+qt_finalize_executable(ObscuraQtEditor)
+
 set_target_properties(ObscuraQtEditor PROPERTIES
-#    MACOSX_BUNDLE_GUI_IDENTIFIER com.example.appObscura
+    QT_QML_GENERATE_QMLLS_INI ON
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE

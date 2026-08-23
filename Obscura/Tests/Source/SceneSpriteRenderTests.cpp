@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <Scene/Scene.hpp>
-#include <Scene/SceneRenderer.hpp>
+#include <Renderer/SceneRenderer.hpp>
 #include <Vulkan/VulkanBindlessSystem.hpp>
 #include <Vulkan/VulkanRHI.hpp>
 #include <Vulkan/VulkanTexture.hpp>
@@ -50,11 +50,10 @@ TEST_F(SceneSpriteRenderTest, SceneRenderer_InitializeAndOffscreenSpritePass)
 {
     m_SceneRenderer = std::make_unique<Obscura::SceneRenderer>();
     ASSERT_TRUE(m_SceneRenderer->Initialize(m_RHI.get()));
-    EXPECT_TRUE(m_SceneRenderer->IsValid());
 
     // Create Scene with two entities
     Obscura::Scene scene;
-    
+
     // Entity 1: Solid green sprite quad
     auto greenEntity = scene.CreateEntity("GreenSprite");
     auto& greenTransform = scene.GetComponent<Obscura::Transform>(greenEntity);
@@ -92,7 +91,7 @@ TEST_F(SceneSpriteRenderTest, SceneRenderer_InitializeAndOffscreenSpritePass)
     for (int frame = 0; frame < 3; ++frame)
     {
         m_RHI->BeginFrame();
-        m_SceneRenderer->Render(scene, m_RHI.get());
+        m_SceneRenderer->Render(&scene, m_RHI.get());
         m_RHI->EndFrame();
     }
 
@@ -101,9 +100,50 @@ TEST_F(SceneSpriteRenderTest, SceneRenderer_InitializeAndOffscreenSpritePass)
     m_SceneRenderer->OnResize(800, 600, m_RHI.get());
 
     m_RHI->BeginFrame();
-    m_SceneRenderer->Render(scene, m_RHI.get());
+    m_SceneRenderer->Render(&scene, m_RHI.get());
     m_RHI->EndFrame();
 
     vkQueueWaitIdle(static_cast<VkQueue>(devObjects.graphicsQueue));
     blueTex.Destroy();
 }
+
+TEST_F(SceneSpriteRenderTest, Batch2D_CapacityGrowthAndMultiQuadRendering)
+{
+    m_SceneRenderer = std::make_unique<Obscura::SceneRenderer>();
+    ASSERT_TRUE(m_SceneRenderer->Initialize(m_RHI.get()));
+
+    auto& batch2D = m_SceneRenderer->GetBatch2D();
+    EXPECT_TRUE(batch2D.IsInitialized());
+    EXPECT_EQ(batch2D.GetMaxQuads(), 256u);
+
+    // Create scene with 600 sprite quads to trigger dynamic capacity doubling
+    Obscura::Scene scene;
+    for (int i = 0; i < 600; ++i)
+    {
+        auto entity = scene.CreateEntity("Sprite_" + std::to_string(i));
+        auto& transform = scene.GetComponent<Obscura::Transform>(entity);
+        transform.position = glm::vec3(static_cast<float>(i % 20) * 0.1f - 1.0f,
+                                       static_cast<float>(i / 20) * 0.1f - 1.0f,
+                                       0.0f);
+        transform.scale    = glm::vec3(0.08f, 0.08f, 1.0f);
+
+        auto& sprite = scene.AddComponent<Obscura::Sprite2D>(entity);
+        sprite.color = glm::vec4(static_cast<float>(i % 10) / 10.0f, 0.5f, 1.0f, 1.0f);
+        sprite.useTexture = false;
+    }
+
+    // Render multiple frames to verify no crashes, smooth buffer reuse, and capacity growth
+    for (int frame = 0; frame < 5; ++frame)
+    {
+        m_RHI->BeginFrame();
+        m_SceneRenderer->Render(&scene, m_RHI.get());
+        m_RHI->EndFrame();
+    }
+
+    EXPECT_GE(batch2D.GetMaxQuads(), 600u);
+    EXPECT_GE(batch2D.GetStats().quadCount, 600u);
+
+    auto devObjects = m_RHI->GetVulkanDeviceObjects();
+    vkQueueWaitIdle(static_cast<VkQueue>(devObjects.graphicsQueue));
+}
+

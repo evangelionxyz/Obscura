@@ -78,9 +78,6 @@ int main(int argc, char *argv[])
         QQmlApplicationEngine engine;
         engine.rootContext()->setContextProperty("EditorApp", &editorApp);
 
-        // Register QML types
-        qmlRegisterType<ObscuraEditor::EngineViewport>("Obscura.Editor", 1, 0, "EngineViewport");
-
         engine.loadFromModule("Obscura.Editor", "Main");
 
         if (engine.rootObjects().isEmpty())

@@ -18,6 +18,12 @@ namespace Obscura
         virtual IRHI*       GetRHI() const = 0;
         virtual void        Destroy()    = 0;
 
+        // Viewport & Input controls
+        virtual void HandleViewportResize(std::uint32_t width, std::uint32_t height) = 0;
+        virtual void HandleMouseMove(float x, float y, bool rightMouseDown, bool middleMouseDown, bool leftMouseDown) = 0;
+        virtual void HandleMouseButton(int button, bool pressed, float x, float y) = 0;
+        virtual void HandleKey(int key, bool pressed) = 0;
+
         // Scene / Entity inspection & manipulation
         virtual std::uint32_t GetEntityCount() const = 0;
         virtual bool          GetEntityDescByIndex(std::uint32_t index, EntityDesc* outDesc) const = 0;
@@ -28,6 +34,7 @@ namespace Obscura
         virtual bool          SetEntityTransform(std::uint64_t uuid, const float position[3], const float rotation[3], const float scale[3]) = 0;
         virtual bool          SetEntitySprite2D(std::uint64_t uuid, const float color[4], std::uint32_t textureSlot, bool useTexture, const float uvOffset[2], const float uvScale[2], bool visible) = 0;
     };
+
 
     // Function pointer typedefs for dynamic loading
     using CreateEngineFn  = IEngine* (*)(std::uint32_t abiVersion);

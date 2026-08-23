@@ -22,8 +22,7 @@ namespace Obscura
     inline uint64_t GenerateUUID64()
     {
         static thread_local std::mt19937_64 generator(
-            static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count())
-            ^ std::random_device{}()
+            static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) ^ std::random_device{}()
         );
         static thread_local std::uniform_int_distribution<uint64_t> distribution(1, std::numeric_limits<uint64_t>::max());
         return distribution(generator);
@@ -32,31 +31,10 @@ namespace Obscura
     // Component: ID (64-bit uint64_t UUID hash, name, parent UUID)
     struct IDComponent
     {
-        uint64_t    uuid       = 0;
-        std::string name       = "Entity";
+        uint64_t    uuid = 0;
+        std::string name = "Entity";
         uint64_t    parentUuid = 0; // 0 = root / no parent
     };
-
-    // Push constant block for 2D Sprite rendering: exactly 128 bytes.
-    struct SpritePushConstants
-    {
-        glm::mat4 model       = glm::mat4(1.0f); // 64 bytes (offset 0)
-        glm::vec4 color       = glm::vec4(1.0f); // 16 bytes (offset 64)
-        glm::vec2 uvOffset    = glm::vec2(0.0f); // 8 bytes  (offset 80)
-        glm::vec2 uvScale     = glm::vec2(1.0f); // 8 bytes  (offset 88)
-        uint32_t  textureSlot = 0;               // 4 bytes  (offset 96)
-        uint32_t  useTexture  = 0;               // 4 bytes  (offset 100)
-        float     padding[6]  = { 0.0f };        // 24 bytes (offset 104)
-    };
-    static_assert(sizeof(SpritePushConstants) == 128, "SpritePushConstants must be exactly 128 bytes");
-
-    // Standard MVP Push constants (128 bytes)
-    struct MVPPushConstants
-    {
-        glm::mat4 model    = glm::mat4(1.0f); // 64 bytes
-        glm::mat4 viewProj = glm::mat4(1.0f); // 64 bytes
-    };
-    static_assert(sizeof(MVPPushConstants) == 128, "MVPPushConstants must be exactly 128 bytes");
 
     // Component: Tag / Name
     struct TagComponent

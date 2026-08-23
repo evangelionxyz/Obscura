@@ -31,6 +31,7 @@ namespace ObscuraEditor
         Q_PROPERTY(QString engineVersion READ getEngineVersion NOTIFY engineInitialized)
         Q_PROPERTY(QString rhiName READ getRhiName NOTIFY engineInitialized)
         Q_PROPERTY(double fps READ getFps NOTIFY statsUpdated)
+        Q_PROPERTY(double frameTime READ getFrameTime NOTIFY statsUpdated)
         Q_PROPERTY(quint64 frameCount READ getFrameCount NOTIFY statsUpdated)
         Q_PROPERTY(bool isEngineRunning READ isEngineRunning NOTIFY engineInitialized)
         Q_PROPERTY(bool vsyncEnabled READ isVsyncEnabled WRITE setVsyncEnabled NOTIFY vsyncChanged)
@@ -65,6 +66,7 @@ namespace ObscuraEditor
         [[nodiscard]] QString getEngineVersion() const { return m_EngineVersion; }
         [[nodiscard]] QString getRhiName() const { return m_RhiName; }
         [[nodiscard]] double getFps() const { return m_CurrentFps; }
+        [[nodiscard]] double getFrameTime() const { return m_FrameTime; }
         [[nodiscard]] quint64 getFrameCount() const { return m_FrameCount; }
         [[nodiscard]] bool isEngineRunning() const { return m_Engine != nullptr; }
         [[nodiscard]] bool isVsyncEnabled() const noexcept { return m_VsyncEnabled; }
@@ -95,6 +97,7 @@ namespace ObscuraEditor
         QString                m_EngineVersion = "N/A";
         QString                m_RhiName       = "N/A";
         double                 m_CurrentFps    = 0.0;
+        double                 m_FrameTime     = 0.0;
         quint64                m_FrameCount    = 0;
         quint64                m_FpsFrameCount = 0;
 
@@ -102,6 +105,11 @@ namespace ObscuraEditor
         std::uint32_t          m_ViewportHeight = 720;
         bool                   m_TickingEnabled = true;
         bool                   m_VsyncEnabled   = false;
+
+        bool                   m_RightMouseDown  = false;
+        bool                   m_MiddleMouseDown = false;
+        bool                   m_LeftMouseDown   = false;
     };
+
 }
 

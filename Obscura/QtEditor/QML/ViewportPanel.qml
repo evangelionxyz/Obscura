@@ -39,9 +39,8 @@ Rectangle {
         anchors.margins: 8
         width: hudLayout.implicitWidth + 14
         height: hudLayout.implicitHeight + 10
-        color: "#d9161a22"
-        border.color: "#303644"
-        border.width: 1
+        color: "#00000000"
+        border.width: 0
         z: 20
 
         ColumnLayout {
@@ -66,6 +65,13 @@ Rectangle {
 
             Label {
                 text: `FPS: ${EditorApp.fps.toFixed(1)}  |  Frame: ${EditorApp.frameCount}`
+                font.pixelSize: 12
+                font.family: "Consolas, monospace"
+                color: "#11998e"
+            }
+
+            Label {
+                text: `Frame Time: ${EditorApp.frameTime} ms`
                 font.pixelSize: 12
                 font.family: "Consolas, monospace"
                 color: "#11998e"

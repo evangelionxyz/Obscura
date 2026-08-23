@@ -39,16 +39,26 @@ namespace Obscura
                     const void* data,
                     std::size_t size);
 
+        // Allocate a persistently mapped host-visible dynamic vertex buffer.
+        bool CreateDynamic(VkDevice device,
+                           VkPhysicalDevice physicalDevice,
+                           std::size_t size);
+
+        // Update data in dynamic vertex buffer via fast memory copy.
+        void SetData(const void* data, std::size_t size, std::size_t offset = 0);
+
         void Destroy();
 
-        [[nodiscard]] bool       IsValid()      const noexcept { return m_Buffer != VK_NULL_HANDLE; }
-        [[nodiscard]] VkBuffer   GetBuffer()    const noexcept { return m_Buffer; }
-        [[nodiscard]] std::size_t GetSize()     const noexcept { return m_Size; }
+        [[nodiscard]] bool       IsValid()       const noexcept { return m_Buffer != VK_NULL_HANDLE; }
+        [[nodiscard]] VkBuffer   GetBuffer()     const noexcept { return m_Buffer; }
+        [[nodiscard]] std::size_t GetSize()      const noexcept { return m_Size; }
+        [[nodiscard]] void*      GetMappedData() const noexcept { return m_Mapped; }
 
     private:
         VkDevice        m_Device  = VK_NULL_HANDLE;
         VkBuffer        m_Buffer  = VK_NULL_HANDLE;
         VkDeviceMemory  m_Memory  = VK_NULL_HANDLE;
+        void*           m_Mapped  = nullptr;
         std::size_t     m_Size    = 0;
     };
 
@@ -69,18 +79,62 @@ namespace Obscura
                     uint32_t indexCount,
                     VkIndexType indexType = VK_INDEX_TYPE_UINT32);
 
+        // Allocate a persistently mapped host-visible dynamic index buffer.
+        bool CreateDynamic(VkDevice device,
+                           VkPhysicalDevice physicalDevice,
+                           const void* data,
+                           std::size_t size,
+                           uint32_t indexCount,
+                           VkIndexType indexType = VK_INDEX_TYPE_UINT32);
+
+        // Update data in dynamic index buffer via fast memory copy.
+        void SetData(const void* data, std::size_t size, std::size_t offset = 0);
+
         void Destroy();
 
-        [[nodiscard]] bool        IsValid()      const noexcept { return m_Buffer != VK_NULL_HANDLE; }
-        [[nodiscard]] VkBuffer    GetBuffer()    const noexcept { return m_Buffer; }
-        [[nodiscard]] uint32_t    GetIndexCount()const noexcept { return m_IndexCount; }
-        [[nodiscard]] VkIndexType GetIndexType() const noexcept { return m_IndexType; }
+        [[nodiscard]] bool        IsValid()       const noexcept { return m_Buffer != VK_NULL_HANDLE; }
+        [[nodiscard]] VkBuffer    GetBuffer()     const noexcept { return m_Buffer; }
+        [[nodiscard]] uint32_t    GetIndexCount() const noexcept { return m_IndexCount; }
+        [[nodiscard]] VkIndexType GetIndexType()  const noexcept { return m_IndexType; }
+        [[nodiscard]] void*       GetMappedData() const noexcept { return m_Mapped; }
 
     private:
         VkDevice        m_Device     = VK_NULL_HANDLE;
         VkBuffer        m_Buffer     = VK_NULL_HANDLE;
         VkDeviceMemory  m_Memory     = VK_NULL_HANDLE;
+        void*           m_Mapped     = nullptr;
         uint32_t        m_IndexCount = 0;
         VkIndexType     m_IndexType  = VK_INDEX_TYPE_UINT32;
+    };
+
+
+    class OBSCURA_RENDERER_API VulkanUniformBuffer
+    {
+    public:
+        VulkanUniformBuffer() = default;
+        ~VulkanUniformBuffer() = default;
+
+        // Allocate a persistently mapped host-visible dynamic uniform buffer.
+        bool Create(VkDevice device,
+                           VkPhysicalDevice physicalDevice,
+                           std::size_t size);
+
+        // Update data in dynamic index buffer via fast memory copy.
+        void SetData(const void *data, std::size_t size, std::size_t offset = 0);
+
+        void Destroy();
+
+        [[nodiscard]] bool        IsValid()       const noexcept { return m_Buffer != VK_NULL_HANDLE; }
+        [[nodiscard]] VkBuffer    GetBuffer()     const noexcept { return m_Buffer; }
+        [[nodiscard]] uint32_t    GetIndexCount() const noexcept { return m_IndexCount; }
+        [[nodiscard]] void *GetMappedData()       const noexcept { return m_Mapped; }
+
+    private:
+        VkDevice        m_Device = VK_NULL_HANDLE;
+        VkBuffer        m_Buffer = VK_NULL_HANDLE;
+        VkDeviceMemory  m_Memory = VK_NULL_HANDLE;
+        void *m_Mapped = nullptr;
+        uint32_t        m_IndexCount = 0;
+        std::size_t     m_Size = 0;
     };
 }

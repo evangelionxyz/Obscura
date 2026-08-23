@@ -63,10 +63,10 @@ namespace Obscura
     using WeakRef = std::weak_ptr<T>;
 
     template<typename T>
-    using ScopeRef = std::unique_ptr<T>;
+    using Scope = std::unique_ptr<T>;
 
     template<typename T, typename... Args>
-    static Ref<T> CreateRef(Args&... args)
+    static Ref<T> CreateRef(Args &&... args)
     {
         return std::make_shared<T>(std::forward<Args>(args)...);
     }
@@ -78,7 +78,7 @@ namespace Obscura
     }
 
     template<typename T, typename... Args>
-    static ScopeRef<T> CreateScope(Args&... args)
+    static Scope<T> CreateScope(Args &&... args)
     {
         return std::make_unique<T>(std::forward<Args>(args)...);
     }

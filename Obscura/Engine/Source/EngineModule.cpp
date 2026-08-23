@@ -8,10 +8,13 @@
 #include <Obscura/WorkerManager.hpp>
 #include "Assets/AssetManager.hpp"
 #include "Scene/Scene.hpp"
-#include "Scene/SceneRenderer.hpp"
+#include "Scene/EditorCamera.hpp"
+
+#include "Renderer/SceneRenderer.hpp"
 
 #include <filesystem>
 #include <memory>
+#include <algorithm>
 
 namespace
 {
@@ -74,11 +77,15 @@ public:
 
         LOG_INFO("[Engine.dll] Attached RHI Backend: {}", m_RHI->GetName());
 
+        // Initialize EditorCamera (Perspective by default)
+        m_EditorCamera.SetViewportSize(m_Params.WindowWidth, m_Params.WindowHeight);
+        m_EditorCamera.SetPosition(glm::vec3(0.0f, 0.0f, 8.0f));
+
         // Initialize Engine SceneRenderer
-        m_SceneRenderer = std::make_unique<Obscura::SceneRenderer>();
+        m_SceneRenderer = Obscura::CreateScope<Obscura::SceneRenderer>();
         if (!m_SceneRenderer->Initialize(m_RHI))
         {
-            LOG_WARN("[Engine.dll] SceneRenderer failed to initialize — scene draws will be disabled.");
+            LOG_ASSERT(false, "[Engine.dll] SceneRenderer failed to initialize — scene draws will be disabled.");
         }
         else
         {
@@ -127,17 +134,84 @@ public:
     void Tick(float deltaTime) override
     {
         m_FrameCount++;
+
+        // Process WASD camera movement ONLY when Right Mouse Button is held
+        if (m_RightMouseDown)
+        {
+            m_EditorCamera.ProcessKeyboard(m_KeyW, m_KeyA, m_KeyS, m_KeyD, m_KeyQ, m_KeyE, deltaTime, 5.0f);
+        }
+        m_EditorCamera.OnUpdate(deltaTime);
+
         if (m_RHI)
         {
             m_RHI->BeginFrame();
 
-            if (m_SceneRenderer && m_SceneRenderer->IsValid())
+            if (m_SceneRenderer)
             {
-                m_SceneRenderer->Render(m_Scene, m_RHI);
+                m_SceneRenderer->Render(&m_Scene, m_EditorCamera, m_RHI);
             }
 
             m_RHI->EndFrame();
         }
+    }
+
+    void HandleViewportResize(std::uint32_t width, std::uint32_t height) override
+    {
+        if (width == 0 || height == 0) return;
+        m_EditorCamera.SetViewportSize(width, height);
+        if (m_SceneRenderer)
+        {
+            m_SceneRenderer->OnResize(width, height, m_RHI);
+        }
+    }
+
+    void HandleMouseMove(float x, float y, bool rightMouseDown, bool middleMouseDown, bool leftMouseDown) override
+    {
+        float dx = x - m_LastMouseX;
+        float dy = y - m_LastMouseY;
+        m_LastMouseX = x;
+        m_LastMouseY = y;
+        m_RightMouseDown = rightMouseDown;
+
+        if (rightMouseDown)
+        {
+            m_EditorCamera.MouseRotate(glm::vec2(dx, dy));
+        }
+        else if (middleMouseDown)
+        {
+            m_EditorCamera.MousePan(glm::vec2(dx, dy));
+        }
+    }
+
+    void HandleMouseButton(int button, bool pressed, float x, float y) override
+    {
+        m_LastMouseX = x;
+        m_LastMouseY = y;
+
+        // Qt::RightButton = 2, Qt::LeftButton = 1, Qt::MiddleButton = 4
+        if (button == 2)
+        {
+            m_RightMouseDown = pressed;
+        }
+        else if (button == 4)
+        {
+            m_MiddleMouseDown = pressed;
+        }
+        else if (button == 1)
+        {
+            m_LeftMouseDown = pressed;
+        }
+    }
+
+    void HandleKey(int key, bool pressed) override
+    {
+        // Handle Qt key codes / ASCII chars for WASD + QE
+        if (key == 'W' || key == 'w' || key == 0x57) m_KeyW = pressed;
+        if (key == 'A' || key == 'a' || key == 0x41) m_KeyA = pressed;
+        if (key == 'S' || key == 's' || key == 0x53) m_KeyS = pressed;
+        if (key == 'D' || key == 'd' || key == 0x44) m_KeyD = pressed;
+        if (key == 'Q' || key == 'q' || key == 0x51) m_KeyQ = pressed;
+        if (key == 'E' || key == 'e' || key == 0x45) m_KeyE = pressed;
     }
 
     const char* GetVersion() const override
@@ -298,14 +372,28 @@ private:
     }
 
 private:
-    Obscura::EngineInitParams                  m_Params{};
-    Obscura::Module                            m_RhiModule;
-    Obscura::IRHI*                             m_RHI          = nullptr;
-    Obscura::DestroyRHIFn                      m_DestroyRHIFn = nullptr;
-    uint32_t                                   m_FrameCount   = 0;
+    Obscura::EngineInitParams              m_Params{};
+    Obscura::Module                        m_RhiModule;
+    Obscura::IRHI*                         m_RHI          = nullptr;
+    Obscura::DestroyRHIFn                  m_DestroyRHIFn = nullptr;
+    uint32_t                               m_FrameCount   = 0;
 
-    Obscura::Scene                             m_Scene;
-    std::unique_ptr<Obscura::SceneRenderer>    m_SceneRenderer;
+    Obscura::Scene                         m_Scene;
+    Obscura::Scope<Obscura::SceneRenderer> m_SceneRenderer;
+    Obscura::EditorCamera                  m_EditorCamera;
+
+    float                                  m_LastMouseX     = 0.0f;
+    float                                  m_LastMouseY     = 0.0f;
+    bool                                   m_RightMouseDown = false;
+    bool                                   m_MiddleMouseDown= false;
+    bool                                   m_LeftMouseDown  = false;
+
+    bool                                   m_KeyW = false;
+    bool                                   m_KeyA = false;
+    bool                                   m_KeyS = false;
+    bool                                   m_KeyD = false;
+    bool                                   m_KeyQ = false;
+    bool                                   m_KeyE = false;
 };
 
 } // anonymous namespace

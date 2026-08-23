@@ -1,18 +1,38 @@
 #include "Obscura/Logger.hpp"
-#include <memory>
+#include "Obscura/Types.hpp"
+
+#include <spdlog/sinks/base_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <vector>
 
-struct LoggerImpl
-{
-    std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> stdoutSink;
-    std::shared_ptr<spdlog::logger> logger;
-};
-
-static LoggerImpl *impl = nullptr;
+#include <memory>
+#include <mutex>
 
 namespace Obscura
 {
+    class ConsoleSink : public spdlog::sinks::base_sink<std::mutex>
+    {
+    public:
+        void sink_it_(const spdlog::details::log_msg& msg) override
+        {
+            spdlog::memory_buf_t formatted;
+            spdlog::sinks::base_sink<std::mutex>::formatter_->format(msg, formatted);
+            m_Messages.push_back({ msg.level, fmt::to_string(formatted) });
+        }
+
+        void flush_() override {}
+
+        std::vector<Obscura::LogMessage> m_Messages;
+    };
+
+    struct LoggerImpl
+    {
+        Ref<spdlog::logger> logger;
+        Ref<spdlog::sinks::stdout_color_sink_mt> stdoutSink;
+        Ref<Obscura::ConsoleSink> consoleSink;
+    };
+
+    static LoggerImpl *impl = nullptr;
+
     void Logger::Init()
     {
         if (impl)
@@ -22,15 +42,15 @@ namespace Obscura
 
         impl = new LoggerImpl();
 
-        impl->stdoutSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        impl->stdoutSink = CreateRef<spdlog::sinks::stdout_color_sink_mt>();
         impl->stdoutSink->set_pattern("%^[%T] [%l] %n: %v%$");
 
-        std::vector<spdlog::sink_ptr> sinks { impl->stdoutSink };
+        impl->consoleSink = CreateRef<Obscura::ConsoleSink>();
+        impl->consoleSink->set_pattern("[%T] [%l] %n: %v");
 
-        impl->logger = std::make_shared<spdlog::logger>(
-            "Obscura", sinks.begin(), sinks.end()
-        );
+        std::vector<spdlog::sink_ptr> sinks = { impl->stdoutSink, impl->consoleSink };
 
+        impl->logger = CreateRef<spdlog::logger>("Obscura", sinks.begin(), sinks.end());
         impl->logger->set_level(spdlog::level::trace);
         spdlog::set_default_logger(impl->logger);
     }
@@ -39,16 +59,33 @@ namespace Obscura
     {
         if (impl)
         {
-            if (impl->stdoutSink)
-            {
-                impl->stdoutSink->flush();
-            }
-            if (impl->logger)
-            {
-                impl->logger->flush();
-            }
+            impl->logger->flush();
+            impl->stdoutSink->flush();
+            impl->consoleSink->flush();
+
             delete impl;
             impl = nullptr;
+        }
+    }
+
+    const std::vector<LogMessage> &Logger::GetLogs()
+    {
+        return impl->consoleSink->m_Messages;
+    }
+
+    void Logger::ClearLogs()
+    {
+        if (impl)
+        {
+            impl->consoleSink->m_Messages.clear();
+        }
+    }
+
+    void Logger::PushLog(spdlog::level::level_enum level, const std::string &message)
+    {
+        if (impl)
+        {
+            impl->consoleSink->m_Messages.push_back({ level, message });
         }
     }
 

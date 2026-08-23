@@ -1,6 +1,5 @@
 #include "VulkanGraphicsPipeline.hpp"
-
-#include <Obscura/Logger.hpp>
+#include "VulkanUtils.hpp"
 
 #include <algorithm>
 #include <array>
@@ -56,6 +55,7 @@ namespace Obscura
     // Create
     // ---------------------------------------------------------------------------
     bool VulkanGraphicsPipeline::Create(
+        GraphicsPipelineCreateInfo                          &info,
         VkDevice                                            device,
         const VulkanShader&                                 vertShader,
         const VulkanShader&                                 fragShader,
@@ -80,7 +80,7 @@ namespace Obscura
         if (!BuildPipelineLayout(vertShader, fragShader, externalDescriptorSetLayouts))
             return false;
 
-        if (!BuildPipeline(vertShader, fragShader))
+        if (!BuildPipeline(info, vertShader, fragShader))
             return false;
 
         if (width > 0 && height > 0 && imageViews[0] != VK_NULL_HANDLE)
@@ -287,7 +287,8 @@ namespace Obscura
     // ---------------------------------------------------------------------------
     // BuildPipeline — vertex input from reflection, everything else from design
     // ---------------------------------------------------------------------------
-    bool VulkanGraphicsPipeline::BuildPipeline(const VulkanShader& vertShader,
+    bool VulkanGraphicsPipeline::BuildPipeline(GraphicsPipelineCreateInfo &info,
+                                               const VulkanShader& vertShader,
                                                const VulkanShader& fragShader)
     {
         // --- Shader stages ---
@@ -308,31 +309,54 @@ namespace Obscura
         std::vector<VkVertexInputAttributeDescription> attrDescs;
         uint32_t stride = 0;
 
-        // Use reflected vertex attributes if available; otherwise fall back to
-        // the known layout of our default shader: vec3 pos + vec3 color = 24 bytes.
         if (!vertRefl.vertexAttributes.empty())
         {
-            attrDescs.reserve(vertRefl.vertexAttributes.size());
-            for (const auto& attr : vertRefl.vertexAttributes)
+            std::vector<umbra::VertexAttribute> sortedAttrs(vertRefl.vertexAttributes);
+            std::sort(sortedAttrs.begin(), sortedAttrs.end(),
+                      [](const umbra::VertexAttribute& a, const umbra::VertexAttribute& b)
+                      { return a.location < b.location; });
+
+            attrDescs.reserve(sortedAttrs.size());
+            uint32_t currentOffset = 0;
+            for (const auto& attr : sortedAttrs)
             {
                 VkVertexInputAttributeDescription desc{};
                 desc.location = attr.location;
                 desc.binding  = 0; // Single binding
                 desc.format   = UmbraFormatToVk(attr.format);
-                desc.offset   = attr.offset;
+                desc.offset   = currentOffset;
                 attrDescs.push_back(desc);
-                stride += UmbraFormatSize(attr.format);
+
+                const uint32_t fmtSize = UmbraFormatSize(attr.format);
+                currentOffset          += fmtSize;
+                stride                 += fmtSize;
             }
         }
-        else
+        else if (!vertRefl.stageInputs.empty())
         {
-            // Fallback: pos(vec3) at loc=0, color(vec3) at loc=1
-            LOG_INFO("[VulkanGraphicsPipeline] No vertex attributes reflected — using default pos+color layout.");
-            attrDescs = {
-                { 0, 0, VK_FORMAT_R32G32B32_SFLOAT,  0  },  // position
-                { 1, 0, VK_FORMAT_R32G32B32_SFLOAT,  12 },  // color
-            };
-            stride = 24; // 2 x vec3
+            // SPIR-V reflection populates stageInputs, not vertexAttributes.
+            // Sort by location and derive packed byte offsets cumulatively.
+            LOG_INFO("[VulkanGraphicsPipeline] vertexAttributes empty — deriving layout from stageInputs.");
+            std::vector<umbra::ShaderStageIOInfo> sortedInputs(vertRefl.stageInputs);
+            std::sort(sortedInputs.begin(), sortedInputs.end(),
+                      [](const umbra::ShaderStageIOInfo& a, const umbra::ShaderStageIOInfo& b)
+                      { return a.location < b.location; });
+
+            attrDescs.reserve(sortedInputs.size());
+            uint32_t currentOffset = 0;
+            for (const auto& input : sortedInputs)
+            {
+                VkVertexInputAttributeDescription desc{};
+                desc.location = input.location;
+                desc.binding  = 0;
+                desc.format   = UmbraFormatToVk(input.format);
+                desc.offset   = currentOffset;
+                attrDescs.push_back(desc);
+
+                const uint32_t fmtSize = UmbraFormatSize(input.format);
+                currentOffset          += fmtSize;
+                stride                 += fmtSize;
+            }
         }
 
         VkVertexInputBindingDescription bindingDesc{};
@@ -350,7 +374,7 @@ namespace Obscura
         // --- Input assembly ---
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-        inputAssembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.topology               = static_cast<VkPrimitiveTopology>(info.primitive);
         inputAssembly.primitiveRestartEnable = VK_FALSE;
 
         // --- Viewport & scissor (Dynamic State) ---
@@ -390,11 +414,11 @@ namespace Obscura
         rasterizer.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         rasterizer.depthClampEnable        = VK_FALSE;
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
-        rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
-        rasterizer.cullMode                = VK_CULL_MODE_NONE; // No culling for initial triangle
-        rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizer.polygonMode             = static_cast<VkPolygonMode>(info.fillMode);
+        rasterizer.cullMode                = static_cast<VkCullModeFlagBits>(info.cullMode);
+        rasterizer.frontFace               = static_cast<VkFrontFace>(info.frontFace);
         rasterizer.depthBiasEnable         = VK_FALSE;
-        rasterizer.lineWidth               = 1.0f;
+        rasterizer.lineWidth               = info.lineWidth;
 
         // --- Multisampling ---
         VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -406,7 +430,7 @@ namespace Obscura
         VkPipelineColorBlendAttachmentState blendAttachment{};
         blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        blendAttachment.blendEnable    = VK_FALSE;
+        blendAttachment.blendEnable    = info.enableBlend;
 
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -417,10 +441,10 @@ namespace Obscura
         // --- No depth/stencil (design: no depth buffer in v1) ---
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
         depthStencil.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthStencil.depthTestEnable       = VK_FALSE;
-        depthStencil.depthWriteEnable      = VK_FALSE;
-        depthStencil.depthBoundsTestEnable = VK_FALSE;
-        depthStencil.stencilTestEnable     = VK_FALSE;
+        depthStencil.depthTestEnable       = info.enableDepthTest;
+        depthStencil.depthWriteEnable      = info.enableDepthWrite;
+        depthStencil.depthBoundsTestEnable = info.enableDepthBoundsTest;
+        depthStencil.stencilTestEnable     = info.enableStencilTest;
 
         // --- Assemble pipeline ---
         VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -439,13 +463,9 @@ namespace Obscura
         pipelineInfo.renderPass          = m_RenderPass;
         pipelineInfo.subpass             = 0;
 
-        VkResult res = vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline);
-        if (res != VK_SUCCESS)
-        {
-            LOG_ERROR("[VulkanGraphicsPipeline] vkCreateGraphicsPipelines failed: {}", static_cast<int>(res));
-            return false;
-        }
-        return true;
+        const VkResult res = vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline);
+        VULKAN_CHECK(res, "[VulkanGraphicsPipeline] vkCreateGraphicsPipelines failed : {}", static_cast<int>(res));
+        return res == VK_SUCCESS;
     }
 
     // ---------------------------------------------------------------------------
@@ -506,15 +526,20 @@ namespace Obscura
     // ---------------------------------------------------------------------------
     void VulkanGraphicsPipeline::DestroyFramebuffers()
     {
-        for (uint32_t i = 0; i < PIPELINE_BACKBUFFER_COUNT; ++i)
+        if (m_Device != VK_NULL_HANDLE)
         {
-            if (m_Framebuffers[i] != VK_NULL_HANDLE)
+            vkDeviceWaitIdle(m_Device);
+            for (uint32_t i = 0; i < PIPELINE_BACKBUFFER_COUNT; ++i)
             {
-                vkDestroyFramebuffer(m_Device, m_Framebuffers[i], nullptr);
-                m_Framebuffers[i] = VK_NULL_HANDLE;
+                if (m_Framebuffers[i] != VK_NULL_HANDLE)
+                {
+                    vkDestroyFramebuffer(m_Device, m_Framebuffers[i], nullptr);
+                    m_Framebuffers[i] = VK_NULL_HANDLE;
+                }
             }
         }
     }
+
 
     void VulkanGraphicsPipeline::Destroy()
     {

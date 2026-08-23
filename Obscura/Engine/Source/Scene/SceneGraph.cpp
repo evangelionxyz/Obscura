@@ -3,6 +3,9 @@
 #include "Vulkan/VulkanBindlessSystem.hpp"
 #include "Vulkan/VulkanBuffers.hpp"
 #include "Vulkan/VulkanGraphicsPipeline.hpp"
+#include "Renderer/Batch2D.hpp"
+
+#include "Scene/Scene.hpp"
 
 #if defined(_WIN32)
     #ifndef NOMINMAX
@@ -20,23 +23,14 @@
 
 namespace Obscura
 {
-    void SceneGraph::Render(void* commandBufferVoid,
-                            const Scene& scene,
-                            VulkanGraphicsPipeline* pipeline,
-                            VulkanVertexBuffer* quadVB,
-                            VulkanIndexBuffer* quadIB)
+    void SceneGraph::RenderBatch2D(VulkanGraphicsPipeline *pipeline, Batch2D *batch2D)
     {
-        if (!commandBufferVoid || !pipeline || !pipeline->IsValid() || !quadVB || !quadIB)
-        {
-            return;
-        }
+        auto cmd = static_cast<VkCommandBuffer>(m_CommandBuffer);
 
-        auto cmd = static_cast<VkCommandBuffer>(commandBufferVoid);
-
-        // 1. Bind Graphics Pipeline
+        // Batch 2D Pass
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetPipeline());
 
-        // 2. Bind global bindless descriptor set (Set 0) if available
+        // 2Bind global bindless descriptor set (Set 0) if available
         if (VulkanBindlessSystem::IsInitialized() && VulkanBindlessSystem::GetDescriptorSet() != VK_NULL_HANDLE)
         {
             VkDescriptorSet bindlessSet = VulkanBindlessSystem::GetDescriptorSet();
@@ -50,40 +44,54 @@ namespace Obscura
                                     nullptr);
         }
 
-        // 3. Bind Quad Vertex and Index Buffers
-        VkBuffer     vertBufs[] = { quadVB->GetBuffer() };
-        VkDeviceSize offsets[]  = { 0 };
-        vkCmdBindVertexBuffers(cmd, 0, 1, vertBufs, offsets);
-        vkCmdBindIndexBuffer(cmd, quadIB->GetBuffer(), 0, quadIB->GetIndexType());
-
-        // 4. Iterate and render all Sprite2D entities
-        const auto& registry = scene.GetRegistry();
-        const auto spriteView = registry.view<Transform, Sprite2D>();
-
-        for (auto entity : spriteView)
+        if (batch2D && batch2D->IsInitialized())
         {
-            const auto& [transform, sprite] = spriteView.get<Transform, Sprite2D>(entity);
-            if (!sprite.visible)
+            batch2D->BeginBatch(m_Scene->GetViewProj(), m_FrameIndex);
+
+            const auto& registry = m_Scene->GetRegistry();
+            const auto spriteView = registry.view<Transform, Sprite2D>();
+
+            for (auto entity : spriteView)
             {
-                continue;
+                const auto& [transform, sprite] = spriteView.get<Transform, Sprite2D>(entity);
+                if (!sprite.visible)
+                {
+                    continue;
+                }
+
+                uint32_t useTex = sprite.useTexture ? 1u : 0u;
+                if (batch2D->GetQuadCount() > 0 && (batch2D->GetCurrentTextureSlot() != sprite.textureSlot || batch2D->GetCurrentUseTexture() != useTex))
+                {
+                    batch2D->Flush(cmd, pipeline->GetLayout());
+                    batch2D->BeginBatch(m_Scene->GetViewProj(), m_FrameIndex);
+                }
+
+                batch2D->DrawQuad(transform.GetTransformMatrix(), sprite.color, sprite.textureSlot, useTex, sprite.uvOffset, sprite.uvScale);
             }
 
-            SpritePushConstants pushConstants{};
-            pushConstants.model       = scene.GetViewProj() * transform.GetTransformMatrix();
-            pushConstants.color       = sprite.color;
-            pushConstants.uvOffset    = sprite.uvOffset;
-            pushConstants.uvScale     = sprite.uvScale;
-            pushConstants.textureSlot = sprite.textureSlot;
-            pushConstants.useTexture  = sprite.useTexture ? 1u : 0u;
-
-            vkCmdPushConstants(cmd,
-                               pipeline->GetLayout(),
-                               VK_SHADER_STAGE_VERTEX_BIT,
-                               0,
-                               sizeof(SpritePushConstants),
-                               &pushConstants);
-
-            vkCmdDrawIndexed(cmd, quadIB->GetIndexCount(), 1, 0, 0, 0);
+            if (batch2D->GetQuadCount() > 0)
+            {
+                batch2D->Flush(cmd, pipeline->GetLayout());
+                batch2D->EndBatch();
+            }
         }
     }
+
+    bool SceneGraph::Begin(void *commandBuffer, Scene *scene, const uint32_t frameIndex)
+    {
+        if (!commandBuffer || !scene)
+            return false;
+
+        m_CommandBuffer = commandBuffer;
+        m_Scene = scene;
+        m_FrameIndex = frameIndex;
+
+        return true;
+    }
+
+    void SceneGraph::End()
+    {
+
+    }
+
 }

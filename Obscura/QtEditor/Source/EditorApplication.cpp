@@ -190,6 +190,7 @@ namespace ObscuraEditor
 
         if (m_Engine)
         {
+            m_Engine->HandleViewportResize(width, height);
             if (auto* rhi = m_Engine->GetRHI())
             {
                 if (rhi->ResizeOffscreenTarget(width, height))
@@ -202,18 +203,42 @@ namespace ObscuraEditor
 
     void EditorApplication::handleMouseMove(float x, float y)
     {
-        // Forward mouse move to engine input system
+        if (m_Engine)
+        {
+            m_Engine->HandleMouseMove(x, y, m_RightMouseDown, m_MiddleMouseDown, m_LeftMouseDown);
+        }
     }
 
     void EditorApplication::handleMouseButton(int button, bool pressed, float x, float y)
     {
-        // Forward mouse button to engine input system
+        // Qt::RightButton = 2, Qt::LeftButton = 1, Qt::MiddleButton = 4
+        if (button == static_cast<int>(Qt::RightButton) || button == 2)
+        {
+            m_RightMouseDown = pressed;
+        }
+        else if (button == static_cast<int>(Qt::MiddleButton) || button == 4)
+        {
+            m_MiddleMouseDown = pressed;
+        }
+        else if (button == static_cast<int>(Qt::LeftButton) || button == 1)
+        {
+            m_LeftMouseDown = pressed;
+        }
+
+        if (m_Engine)
+        {
+            m_Engine->HandleMouseButton(button, pressed, x, y);
+        }
     }
 
     void EditorApplication::handleKey(int key, bool pressed)
     {
-        // Forward key event to engine input system
+        if (m_Engine)
+        {
+            m_Engine->HandleKey(key, pressed);
+        }
     }
+
 
     void EditorApplication::setTickingEnabled(bool enabled)
     {
@@ -270,6 +295,8 @@ namespace ObscuraEditor
         if (m_FpsTimer.elapsed() >= 500)
         {
             m_CurrentFps = static_cast<double>(m_FpsFrameCount) * 1000.0 / static_cast<double>(m_FpsTimer.elapsed());
+            m_FrameTime = 1.0 / m_CurrentFps;
+
             m_FpsFrameCount = 0;
             m_FpsTimer.restart();
             emit statsUpdated();

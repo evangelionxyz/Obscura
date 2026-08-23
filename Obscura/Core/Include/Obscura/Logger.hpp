@@ -5,6 +5,8 @@
 #include <spdlog/async.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include <vector>
+
 #if defined(_DEBUG)
     #ifdef _WIN32
         #define DEBUGBREAK() __debugbreak()
@@ -29,6 +31,10 @@ namespace Obscura
         static void Init();
         static void Shutdown();
         static spdlog::logger* GetLogger();
+
+        static const std::vector<LogMessage> &GetLogs();
+        static void ClearLogs();
+        static void PushLog(spdlog::level::level_enum level, const std::string &message);
     };
 }
 
